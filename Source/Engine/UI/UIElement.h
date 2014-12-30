@@ -156,9 +156,11 @@ public:
     /// React to mouse drag begin.
     virtual void OnDragBegin(const IntVector2& position, const IntVector2& screenPosition, int buttons, int qualifiers, Cursor* cursor);
     /// React to mouse drag motion.
-    virtual void OnDragMove(const IntVector2& position, const IntVector2& screenPosition, int buttons, int qualifiers, Cursor* cursor);
+    virtual void OnDragMove(const IntVector2& position, const IntVector2& screenPosition, const IntVector2& deltaPos, int buttons, int qualifiers, Cursor* cursor);
     /// React to mouse drag end.
-    virtual void OnDragEnd(const IntVector2& position, const IntVector2& screenPosition, Cursor* cursor);
+    virtual void OnDragEnd(const IntVector2& position, const IntVector2& screenPosition, int dragButtons, int releaseButton, Cursor* cursor);
+    /// React to a mouse drag cancel event (ie, when an extra button is pressed)
+    virtual void OnDragCancel(const IntVector2& position, const IntVector2& screenPosition, int dragButtons, int cancelButton, Cursor* cursor);
     /// React to drag and drop test. Return true to signal that the drop is acceptable.
     virtual bool OnDragDropTest(UIElement* source);
     /// React to drag and drop finish. Return true to signal that the drop was accepted.
@@ -285,6 +287,8 @@ public:
     void SetLayoutSpacing(int spacing);
     /// Set layout border.
     void SetLayoutBorder(const IntRect& border);
+    /// Set layout flex scale.
+    void SetLayoutFlexScale(const Vector2& scale);
     /// Set horizontal indentation.
     void SetIndent(int indent);
     /// Set indent spacing (number of pixels per indentation level).
@@ -413,6 +417,8 @@ public:
     int GetLayoutSpacing() const { return layoutSpacing_; }
     /// Return layout border.
     const IntRect& GetLayoutBorder() const { return layoutBorder_; }
+    /// Return layout flex scale.
+    const Vector2& GetLayoutFlexScale() const { return layoutFlexScale_; }
     /// Return number of child elements.
     unsigned GetNumChildren(bool recursive = false) const;
     /// Return child element by index.
@@ -435,6 +441,10 @@ public:
     const Variant& GetVar(const StringHash& key) const;
     /// Return all user variables.
     const VariantMap& GetVars() const { return vars_; }
+    /// Return the drag button combo if this element is being dragged.
+    int GetDragButtonCombo() const { return dragButtonCombo_; }
+    /// Return the number of buttons dragging this element.
+    unsigned GetDragButtonCount() const { return dragButtonCount_; }
 
     /// Convert screen coordinates to element coordinates.
     IntVector2 ScreenToElement(const IntVector2& screenPosition);
@@ -448,15 +458,16 @@ public:
     IntRect GetCombinedScreenRect();
     /// Sort child elements if sorting enabled and order dirty. Called by UI.
     void SortChildren();
-    /// Return minimum layout element size in the layout direction. Only valid after layout has been calculated.
+    /// Return minimum layout element size in the layout direction. Only valid after layout has been calculated. Used internally by UI for optimizations.
     int GetLayoutMinSize() const { return layoutMinSize_; }
+    /// Return maximum layout element size in the layout direction. Only valid after layout has been calculated. Used internally by UI for optimizations.
+    int GetLayoutMaxSize() const { return layoutMaxSize_; }
     /// Return horizontal indentation.
     int GetIndent() const { return indent_; }
     /// Return indent spacing (number of pixels per indentation level).
     int GetIndentSpacing() const { return indentSpacing_; }
     /// Return indent width in pixels.
     int GetIndentWidth() const { return indent_ * indentSpacing_; }
-
     /// Set child offset.
     void SetChildOffset(const IntVector2& offset);
     /// Set hovering state.
@@ -541,12 +552,16 @@ protected:
     int layoutSpacing_;
     /// Layout borders.
     IntRect layoutBorder_;
+    /// Layout flex scale.
+    Vector2 layoutFlexScale_;
     /// Resize nesting level to prevent multiple events and endless loop.
     unsigned resizeNestingLevel_;
     /// Layout update nesting level to prevent endless loop.
     unsigned layoutNestingLevel_;
     /// Layout element minimum size in layout direction.
     int layoutMinSize_;
+    /// Layout element maximum size in layout direction.
+    int layoutMaxSize_;
     /// Horizontal indentation.
     int indent_;
     /// Indent spacing (number of pixels per indentation level).
@@ -559,6 +574,10 @@ protected:
     mutable bool positionDirty_;
     /// Applied style.
     String appliedStyle_;
+    /// Drag button combo.
+    int dragButtonCombo_;
+    /// Drag button count.
+    unsigned dragButtonCount_;
 
 private:
     /// Return child elements recursively.
@@ -566,7 +585,7 @@ private:
     /// Calculate layout width for resizing the parent element.
     int CalculateLayoutParentSize(const PODVector<int>& sizes, int begin, int end, int spacing);
     /// Calculate child widths/positions in the layout.
-    void CalculateLayout(PODVector<int>& positions, PODVector<int>& sizes, const PODVector<int>& minSizes, const PODVector<int>& maxSizes, int targetWidth, int begin, int end, int spacing);
+    void CalculateLayout(PODVector<int>& positions, PODVector<int>& sizes, const PODVector<int>& minSizes, const PODVector<int>& maxSizes, const PODVector<float>& flexScales, int targetWidth, int begin, int end, int spacing);
     /// Get child element constant position in a layout.
     IntVector2 GetLayoutChildPosition(UIElement* child);
     /// Detach from parent.

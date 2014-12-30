@@ -320,6 +320,8 @@ class EditAttributeAction : EditAction
                 SetUIElementModified(target);
             else
                 SetSceneModified();
+                
+            EditScriptAttributes(target, attrIndex);
         }
     }
 
@@ -339,6 +341,8 @@ class EditAttributeAction : EditAction
                 SetUIElementModified(target);
             else
                 SetSceneModified();
+                
+            EditScriptAttributes(target, attrIndex);
         }
     }
 }
@@ -366,7 +370,7 @@ class ResetAttributesAction : EditAction
             for (uint i = 0; i < keys.length; ++i)
             {
                 // If variable name is empty (or unregistered) then it is an internal variable and should be preserved
-                String name = GetVariableName(keys[i]);
+                String name = GetVarName(keys[i]);
                 if (name.empty)
                     internalVars[keys[i]] = element.vars[keys[i]];
             }
@@ -754,13 +758,13 @@ class EditMaterialAction : EditAction
     XMLFile@ oldState;
     XMLFile@ newState;
     WeakHandle material;
-    
+
     void Define(Material@ material_, XMLFile@ oldState_)
     {
         material = material_;
         oldState = oldState_;
         newState = XMLFile();
-        
+
         XMLElement materialElem = newState.CreateRoot("material");
         material_.Save(materialElem);
     }
@@ -782,6 +786,47 @@ class EditMaterialAction : EditAction
         {
             mat.Load(newState.root);
             RefreshMaterialEditor();
+        }
+    }
+}
+
+class EditParticleEffectAction : EditAction
+{
+    XMLFile@ oldState;
+    XMLFile@ newState;
+    WeakHandle particleEffect;
+    ParticleEmitter@ particleEmitter;
+
+    void Define(ParticleEmitter@ particleEmitter_, ParticleEffect@ particleEffect_, XMLFile@ oldState_)
+    {
+        particleEmitter = particleEmitter_;
+        particleEffect = particleEffect_;
+        oldState = oldState_;
+        newState = XMLFile();
+
+        XMLElement particleElem = newState.CreateRoot("particleeffect");
+        particleEffect_.Save(particleElem);
+    }
+
+    void Undo()
+    {
+        ParticleEffect@ effect = particleEffect.Get();
+        if (effect !is null)
+        {
+            effect.Load(oldState.root);
+            particleEmitter.ApplyEffect();
+            RefreshParticleEffectEditor();
+        }
+    }
+
+    void Redo()
+    {
+        ParticleEffect@ effect = particleEffect.Get();
+        if (effect !is null)
+        {
+            effect.Load(newState.root);
+            particleEmitter.ApplyEffect();
+            RefreshParticleEffectEditor();
         }
     }
 }

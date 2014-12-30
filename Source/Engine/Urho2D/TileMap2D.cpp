@@ -50,7 +50,7 @@ TileMap2D::~TileMap2D()
 void TileMap2D::RegisterObject(Context* context)
 {
     context->RegisterFactory<TileMap2D>(URHO2D_CATEGORY);
-    ACCESSOR_ATTRIBUTE(TileMap2D, VAR_RESOURCEREF, "Tmx File", GetTmxFileAttr, SetTmxFileAttr, ResourceRef, ResourceRef(TmxFile2D::GetTypeStatic()), AM_DEFAULT);
+    MIXED_ACCESSOR_ATTRIBUTE("Tmx File", GetTmxFileAttr, SetTmxFileAttr, ResourceRef, ResourceRef(TmxFile2D::GetTypeStatic()), AM_DEFAULT);
 }
 
 void TileMap2D::DrawDebugGeometry(DebugRenderer* debug, bool depthTest)
@@ -105,18 +105,22 @@ void TileMap2D::SetTmxFile(TmxFile2D* tmxFile)
     if (tmxFile == tmxFile_)
         return;
 
-    if (tmxFile_)
-    {
-        for (unsigned i = 0; i < layers_.Size(); ++i)
-            layers_[i]->GetNode()->Remove();
-        layers_.Clear();
-    }
+    if (rootNode_)
+        rootNode_->RemoveAllChildren();
+
+    layers_.Clear();
 
     tmxFile_ = tmxFile;
     if (!tmxFile_)
         return;
 
     info_ = tmxFile_->GetInfo();
+
+    if (!rootNode_)
+    {
+        rootNode_ = GetNode()->CreateChild("_root_", LOCAL);
+        rootNode_->SetTemporary(true);
+    }
 
     unsigned numLayers = tmxFile_->GetNumLayers();
     layers_.Resize(numLayers);
@@ -125,10 +129,10 @@ void TileMap2D::SetTmxFile(TmxFile2D* tmxFile)
     {
         const TmxLayer2D* tmxLayer = tmxFile_->GetLayer(i);
 
-        SharedPtr<Node> layerNode(GetNode()->CreateChild(tmxLayer->GetName(), LOCAL));
+        Node* layerNode(rootNode_->CreateChild(tmxLayer->GetName(), LOCAL));
         layerNode->SetTemporary(true);
 
-        SharedPtr<TileMapLayer2D> layer(layerNode->CreateComponent<TileMapLayer2D>());
+        TileMapLayer2D* layer = layerNode->CreateComponent<TileMapLayer2D>();
         layer->Initialize(this, tmxLayer);
         layer->SetDrawOrder(i * 10);
 
@@ -159,7 +163,7 @@ bool TileMap2D::PositionToTileIndex(int& x, int& y, const Vector2& position) con
     return info_.PositionToTileIndex(x, y, position);
 }
 
-void TileMap2D::SetTmxFileAttr(ResourceRef value)
+void TileMap2D::SetTmxFileAttr(const ResourceRef& value)
 {
     ResourceCache* cache = GetSubsystem<ResourceCache>();
     SetTmxFile(cache->GetResource<TmxFile2D>(value.name_));
@@ -168,6 +172,18 @@ void TileMap2D::SetTmxFileAttr(ResourceRef value)
 ResourceRef TileMap2D::GetTmxFileAttr() const
 {
     return GetResourceRef(tmxFile_, TmxFile2D::GetTypeStatic());
+}
+
+void TileMap2D::OnNodeSet(Node* node)
+{
+    if (!node)
+    {
+        if (rootNode_)
+            rootNode_->Remove();
+
+        rootNode_ = 0;
+        layers_.Clear();
+    }
 }
 
 }

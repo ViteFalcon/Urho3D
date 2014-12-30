@@ -24,19 +24,10 @@
 #include "Camera.h"
 #include "Context.h"
 #include "Drawable2D.h"
-#include "DrawableProxy2D.h"
-#include "Geometry.h"
-#include "Log.h"
 #include "Material.h"
-#include "MaterialCache2D.h"
-#include "Node.h"
-#include "ResourceCache.h"
+#include "Renderer2D.h"
 #include "Scene.h"
-#include "Sprite2D.h"
-#include "SpriteSheet2D.h"
-#include "Technique.h"
 #include "Texture2D.h"
-#include "VertexBuffer.h"
 
 #include "DebugNew.h"
 
@@ -47,50 +38,37 @@ const float PIXEL_SIZE = 0.01f;
 extern const char* blendModeNames[];
 
 Drawable2D::Drawable2D(Context* context) :
-    Drawable(context, DRAWABLE_GEOMETRY),
+    Drawable(context, DRAWABLE_GEOMETRY2D),
     layer_(0),
     orderInLayer_(0),
     blendMode_(BLEND_ALPHA),
     verticesDirty_(true),
-    materialUpdatePending_(false),
     visibility_(true)
 {
 }
 
 Drawable2D::~Drawable2D()
 {
-    if (drawableProxy_)
-        drawableProxy_->RemoveDrawable(this);
+    if (renderer_)
+        renderer_->RemoveDrawable(this);
 }
 
 void Drawable2D::RegisterObject(Context* context)
 {
-    ACCESSOR_ATTRIBUTE(Drawable2D, VAR_INT, "Layer", GetLayer, SetLayer, int, 0, AM_DEFAULT);
-    ACCESSOR_ATTRIBUTE(Drawable2D, VAR_INT, "Order in Layer", GetOrderInLayer, SetOrderInLayer, int, 0, AM_DEFAULT);
-    ACCESSOR_ATTRIBUTE(Drawable2D, VAR_RESOURCEREF, "Sprite", GetSpriteAttr, SetSpriteAttr, ResourceRef, ResourceRef(Sprite2D::GetTypeStatic()), AM_DEFAULT);
-    ENUM_ACCESSOR_ATTRIBUTE(Drawable2D, "Blend Mode", GetBlendMode, SetBlendModeAttr, BlendMode, blendModeNames, BLEND_ALPHA, AM_DEFAULT);
-    ACCESSOR_ATTRIBUTE(Drawable2D, VAR_RESOURCEREF, "Material", GetMaterialAttr, SetMaterialAttr, ResourceRef, ResourceRef(Material::GetTypeStatic()), AM_DEFAULT);
-    COPY_BASE_ATTRIBUTES(Drawable2D, Drawable);
-}
-
-void Drawable2D::ApplyAttributes()
-{
-    if (materialUpdatePending_)
-    {
-        materialUpdatePending_ = false;
-        UpdateDefaultMaterial();
-    }
+    ACCESSOR_ATTRIBUTE("Layer", GetLayer, SetLayer, int, 0, AM_DEFAULT);
+    ACCESSOR_ATTRIBUTE("Order in Layer", GetOrderInLayer, SetOrderInLayer, int, 0, AM_DEFAULT);
+    ENUM_ACCESSOR_ATTRIBUTE("Blend Mode", GetBlendMode, SetBlendMode, BlendMode, blendModeNames, BLEND_ALPHA, AM_DEFAULT);
+    COPY_BASE_ATTRIBUTES(Drawable);
 }
 
 void Drawable2D::OnSetEnabled()
 {
-    if (!drawableProxy_)
-        return;
+    bool enabled = IsEnabledEffective();
 
-    if (IsEnabledEffective())
-        drawableProxy_->AddDrawable(this);
-    else
-        drawableProxy_->RemoveDrawable(this);
+    if (enabled && renderer_)
+        renderer_->AddDrawable(this);
+    else if (!enabled && renderer_)
+        renderer_->RemoveDrawable(this);
 }
 
 void Drawable2D::SetLayer(int layer)
@@ -100,8 +78,10 @@ void Drawable2D::SetLayer(int layer)
 
     layer_ = layer;
 
-    if (drawableProxy_)
-        drawableProxy_->MarkOrderDirty();
+    OnLayerChanged();
+
+    if (renderer_)
+        renderer_->MarkOrderDirty();
 
     MarkNetworkUpdate();
 }
@@ -112,23 +92,29 @@ void Drawable2D::SetOrderInLayer(int orderInLayer)
         return;
 
     orderInLayer_ = orderInLayer;
+    
+    OnLayerChanged();
 
-    if (drawableProxy_)
-        drawableProxy_->MarkOrderDirty();
+    if (renderer_)
+        renderer_->MarkOrderDirty();
 
     MarkNetworkUpdate();
 }
 
-void Drawable2D::SetSprite(Sprite2D* sprite)
+void Drawable2D::SetTexture(Texture2D* texture)
 {
-    if (sprite == sprite_)
+    if (texture == texture_)
         return;
 
-    sprite_ = sprite;
+    texture_ = texture;
 
     verticesDirty_ = true;
+    material_ = 0;
+    if (renderer_)
+        renderer_->MarkMaterialDirty(this);
+
     OnMarkedDirty(node_);
-    UpdateDefaultMaterial();
+
     MarkNetworkUpdate();
 }
 
@@ -138,32 +124,46 @@ void Drawable2D::SetBlendMode(BlendMode blendMode)
         return;
 
     blendMode_ = blendMode;
+    material_ = 0;
+    if (renderer_)
+        renderer_->MarkMaterialDirty(this);
 
-    UpdateDefaultMaterial();
+    OnBlendModeChanged();
+
     MarkNetworkUpdate();
+}
+
+void Drawable2D::SetCustomMaterial(Material* customMaterial)
+{
+    if (customMaterial == customMaterial_)
+        return;
+
+    customMaterial_ = customMaterial;
+    material_ = 0;
+    if (renderer_)
+        renderer_->MarkMaterialDirty(this);
+
+    MarkNetworkUpdate();
+}
+
+Texture2D* Drawable2D::GetTexture() const
+{
+    return texture_;
+}
+
+Material* Drawable2D::GetCustomMaterial() const
+{
+    return customMaterial_;
 }
 
 void Drawable2D::SetMaterial(Material* material)
 {
-    if (material == material_)
-        return;
-
     material_ = material;
-
-    if (drawableProxy_)
-        drawableProxy_->MarkOrderDirty();
-
-    MarkNetworkUpdate();
 }
 
 Material* Drawable2D::GetMaterial() const
 {
-    return material_;
-}
-
-Material* Drawable2D::GetUsedMaterial() const
-{
-    return material_ ? material_ : defaultMaterial_;
+    return customMaterial_ ? customMaterial_ : material_;
 }
 
 const Vector<Vertex2D>& Drawable2D::GetVertices()
@@ -173,86 +173,26 @@ const Vector<Vertex2D>& Drawable2D::GetVertices()
     return vertices_;
 }
 
-void Drawable2D::SetSpriteAttr(ResourceRef value)
-{
-    // Delay applying material update
-    materialUpdatePending_ = true;
-
-    ResourceCache* cache = GetSubsystem<ResourceCache>();
-
-    if (value.type_ == Sprite2D::GetTypeStatic())
-    {
-        SetSprite(cache->GetResource<Sprite2D>(value.name_));
-        return;
-    }
-
-    if (value.type_ == SpriteSheet2D::GetTypeStatic())
-    {
-        // value.name_ include sprite speet name and sprite name.
-        Vector<String> names = value.name_.Split('@');
-        if (names.Size() != 2)
-            return;
-
-        const String& spriteSheetName = names[0];
-        const String& spriteName = names[1];
-
-        SpriteSheet2D* spriteSheet = cache->GetResource<SpriteSheet2D>(spriteSheetName);
-        if (!spriteSheet)
-            return;
-
-        SetSprite(spriteSheet->GetSprite(spriteName));
-    }
-}
-
-ResourceRef Drawable2D::GetSpriteAttr() const
-{
-    SpriteSheet2D* spriteSheet = 0;
-    if (sprite_)
-        spriteSheet = sprite_->GetSpriteSheet();
-
-    if (!spriteSheet)
-        return GetResourceRef(sprite_, Sprite2D::GetTypeStatic());
-
-    // Combine sprite sheet name and sprite name as resource name.
-    return ResourceRef(spriteSheet->GetType(), spriteSheet->GetName() + "@" + sprite_->GetName());
-}
-
-void Drawable2D::SetBlendModeAttr(BlendMode mode)
-{
-    // Delay applying material update
-    materialUpdatePending_ = true;
-
-    SetBlendMode(mode);
-}
-
-void Drawable2D::SetMaterialAttr(ResourceRef value)
-{
-    // Delay applying material update
-    materialUpdatePending_ = true;
-
-    ResourceCache* cache = GetSubsystem<ResourceCache>();
-    SetMaterial(cache->GetResource<Material>(value.name_));
-}
-
-ResourceRef Drawable2D::GetMaterialAttr() const
-{
-    return GetResourceRef(material_, Material::GetTypeStatic());
-}
-
 void Drawable2D::OnNodeSet(Node* node)
 {
-    Drawable::OnNodeSet(node);
+    // Do not call Drawable::OnNodeSet(node)
 
     if (node)
     {
         Scene* scene = GetScene();
         if (scene)
         {
-            materialCache_ = scene->GetOrCreateComponent<MaterialCache2D>();
-            drawableProxy_ = scene->GetOrCreateComponent<DrawableProxy2D>();
+            renderer_ = scene->GetOrCreateComponent<Renderer2D>();
             if (IsEnabledEffective())
-                drawableProxy_->AddDrawable(this);
+                renderer_->AddDrawable(this);
         }
+
+        node->AddListener(this);
+    }
+    else
+    {
+        if (renderer_)
+            renderer_->RemoveDrawable(this);
     }
 }
 
@@ -263,16 +203,12 @@ void Drawable2D::OnMarkedDirty(Node* node)
     verticesDirty_ = true;
 }
 
-void Drawable2D::UpdateDefaultMaterial()
+void Drawable2D::OnLayerChanged()
 {
-    // Delay the material update
-    if (materialUpdatePending_)
-        return;
+}
 
-    defaultMaterial_ = materialCache_->GetMaterial(GetTexture(), blendMode_);
-
-    if (drawableProxy_)
-        drawableProxy_->MarkOrderDirty();
+void Drawable2D::OnBlendModeChanged()
+{
 }
 
 }

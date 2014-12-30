@@ -244,7 +244,9 @@ int refs;
 float shadowDistance;
 uint shadowMask;
 float speed;
+Sprite2D sprite;
 bool temporary;
+Texture2D texture;
 /* readonly */
 StringHash type;
 /* readonly */
@@ -519,6 +521,7 @@ VariantType type;
 class Audio
 {
 // Methods:
+bool HasMasterGain(const String&) const;
 bool Play();
 void SendEvent(const String&, VariantMap& = VariantMap ( ));
 void SetMode(int, int, bool, bool = true);
@@ -778,6 +781,10 @@ IntRect combinedScreenRect;
 XMLFile defaultStyle;
 /* readonly */
 float derivedOpacity;
+/* readonly */
+uint dragButtonCombo;
+/* readonly */
+int dragButtonCount;
 uint dragDropMode;
 bool editable;
 bool elementEventSender;
@@ -805,6 +812,7 @@ int indentSpacing;
 int indentWidth;
 bool internal;
 IntRect layoutBorder;
+Vector2 layoutFlexScale;
 LayoutMode layoutMode;
 int layoutSpacing;
 int maxHeight;
@@ -998,6 +1006,10 @@ IntRect combinedScreenRect;
 XMLFile defaultStyle;
 /* readonly */
 float derivedOpacity;
+/* readonly */
+uint dragButtonCombo;
+/* readonly */
+int dragButtonCount;
 uint dragDropMode;
 bool editable;
 bool elementEventSender;
@@ -1025,6 +1037,7 @@ int indentSpacing;
 int indentWidth;
 bool internal;
 IntRect layoutBorder;
+Vector2 layoutFlexScale;
 LayoutMode layoutMode;
 int layoutSpacing;
 int maxHeight;
@@ -1291,6 +1304,10 @@ IntRect combinedScreenRect;
 XMLFile defaultStyle;
 /* readonly */
 float derivedOpacity;
+/* readonly */
+uint dragButtonCombo;
+/* readonly */
+int dragButtonCount;
 uint dragDropMode;
 bool editable;
 bool elementEventSender;
@@ -1318,6 +1335,7 @@ int indentSpacing;
 int indentWidth;
 bool internal;
 IntRect layoutBorder;
+Vector2 layoutFlexScale;
 LayoutMode layoutMode;
 int layoutSpacing;
 int maxHeight;
@@ -2985,6 +3003,7 @@ void ApplyAttributes();
 void BringToFront();
 UIElement CreateChild(const String&, const String& = String ( ), uint = M_MAX_UNSIGNED);
 void DefineShape(CursorShape, Texture, const IntRect&, const IntVector2&);
+void DefineShape(const String&, Texture, const IntRect&, const IntVector2&);
 void DisableLayoutUpdate();
 IntVector2 ElementToScreen(const IntVector2&);
 void EnableLayoutUpdate();
@@ -3043,6 +3062,8 @@ void SetMaxSize(int, int);
 void SetMinSize(int, int);
 void SetParent(UIElement, uint = M_MAX_UNSIGNED);
 void SetPosition(int, int);
+void SetShape(CursorShape);
+void SetShape(const String&);
 void SetSize(int, int);
 bool SetStyle(const String&, XMLFile = null);
 bool SetStyle(const XMLElement&);
@@ -3081,6 +3102,10 @@ IntRect combinedScreenRect;
 XMLFile defaultStyle;
 /* readonly */
 float derivedOpacity;
+/* readonly */
+uint dragButtonCombo;
+/* readonly */
+int dragButtonCount;
 uint dragDropMode;
 bool editable;
 bool elementEventSender;
@@ -3108,6 +3133,7 @@ int indentSpacing;
 int indentWidth;
 bool internal;
 IntRect layoutBorder;
+Vector2 layoutFlexScale;
 LayoutMode layoutMode;
 int layoutSpacing;
 int maxHeight;
@@ -3135,7 +3161,7 @@ UIElement root;
 /* readonly */
 IntVector2 screenPosition;
 bool selected;
-CursorShape shape;
+String shape;
 IntVector2 size;
 bool sortChildren;
 String style;
@@ -3661,7 +3687,6 @@ bool inView;
 int layer;
 uint lightMask;
 float lodBias;
-Material material;
 uint maxLights;
 /* readonly */
 Node node;
@@ -3675,8 +3700,8 @@ int orderInLayer;
 int refs;
 float shadowDistance;
 uint shadowMask;
-Sprite2D sprite;
 bool temporary;
+Texture2D texture;
 /* readonly */
 StringHash type;
 /* readonly */
@@ -3807,6 +3832,10 @@ IntRect combinedScreenRect;
 XMLFile defaultStyle;
 /* readonly */
 float derivedOpacity;
+/* readonly */
+uint dragButtonCombo;
+/* readonly */
+int dragButtonCount;
 uint dragDropMode;
 bool editable;
 bool elementEventSender;
@@ -3836,6 +3865,7 @@ bool internal;
 /* readonly */
 Array<UIElement> items;
 IntRect layoutBorder;
+Vector2 layoutFlexScale;
 LayoutMode layoutMode;
 int layoutSpacing;
 /* readonly */
@@ -4101,6 +4131,7 @@ uint GetLastModifiedTime(const String&) const;
 bool Rename(const String&, const String&);
 Array<String> ScanDir(const String&, const String&, uint, bool) const;
 void SendEvent(const String&, VariantMap& = VariantMap ( ));
+bool SetLastModifiedTime(const String&, uint);
 int SystemCommand(const String&, bool = false);
 uint SystemCommandAsync(const String&);
 bool SystemOpen(const String&, const String&);
@@ -4142,6 +4173,7 @@ float quantize;
 class Font
 {
 // Methods:
+IntVector2 GetTotalGlyphOffset(int) const;
 bool Load(File);
 bool Load(VectorBuffer&);
 bool Save(File) const;
@@ -4152,6 +4184,7 @@ bool SaveXML(const String&, int, bool = false);
 void SendEvent(const String&, VariantMap& = VariantMap ( ));
 
 // Properties:
+IntVector2 absoluteGlyphOffset;
 /* readonly */
 StringHash baseType;
 /* readonly */
@@ -4161,6 +4194,7 @@ uint memoryUse;
 String name;
 /* readonly */
 int refs;
+Vector2 scaledGlyphOffset;
 /* readonly */
 StringHash type;
 /* readonly */
@@ -4383,12 +4417,16 @@ uint components;
 /* readonly */
 bool compressed;
 /* readonly */
+CompressedFormat compressedFormat;
+/* readonly */
 int depth;
 /* readonly */
 int height;
 /* readonly */
 uint memoryUse;
 String name;
+/* readonly */
+uint numCompressedLevels;
 /* readonly */
 int refs;
 /* readonly */
@@ -4419,11 +4457,13 @@ bool RecordGesture();
 void RemoveAllGestures();
 bool RemoveGesture(uint);
 bool RemoveScreenJoystick(int);
+void ResetMouseVisible();
 bool SaveGesture(File, uint);
 bool SaveGesture(VectorBuffer&, uint);
 bool SaveGestures(File);
 bool SaveGestures(VectorBuffer&);
 void SendEvent(const String&, VariantMap& = VariantMap ( ));
+void SetMouseVisible(bool, bool = false);
 
 // Properties:
 /* readonly */
@@ -4447,6 +4487,7 @@ Array<bool> mouseButtonDown;
 /* readonly */
 Array<bool> mouseButtonPress;
 bool mouseGrabbed;
+MouseMode mouseMode;
 /* readonly */
 IntVector2 mouseMove;
 /* readonly */
@@ -4888,6 +4929,10 @@ uint cursorPosition;
 XMLFile defaultStyle;
 /* readonly */
 float derivedOpacity;
+/* readonly */
+uint dragButtonCombo;
+/* readonly */
+int dragButtonCount;
 uint dragDropMode;
 uint echoCharacter;
 bool editable;
@@ -4916,6 +4961,7 @@ int indentSpacing;
 int indentWidth;
 bool internal;
 IntRect layoutBorder;
+Vector2 layoutFlexScale;
 LayoutMode layoutMode;
 int layoutSpacing;
 int maxHeight;
@@ -5067,6 +5113,8 @@ Array<Variant> attributeDefaults;
 /* readonly */
 Array<AttributeInfo> attributeInfos;
 Array<Variant> attributes;
+bool autoDisableChildren;
+float autoDisableThreshold;
 int baseIndent;
 /* readonly */
 StringHash baseType;
@@ -5093,6 +5141,10 @@ UIElement contentElement;
 XMLFile defaultStyle;
 /* readonly */
 float derivedOpacity;
+/* readonly */
+uint dragButtonCombo;
+/* readonly */
+int dragButtonCount;
 uint dragDropMode;
 bool editable;
 bool elementEventSender;
@@ -5123,6 +5175,7 @@ bool internal;
 /* readonly */
 Array<UIElement> items;
 IntRect layoutBorder;
+Vector2 layoutFlexScale;
 LayoutMode layoutMode;
 int layoutSpacing;
 int maxHeight;
@@ -5257,9 +5310,12 @@ uint memoryUse;
 String name;
 uint numTechniques;
 /* readonly */
+uint numUsedTextureUnits;
+/* readonly */
 bool occlusion;
 /* readonly */
 int refs;
+Scene scene;
 /* readonly */
 Array<String> shaderParameterNames;
 Array<Variant> shaderParameters;
@@ -5485,6 +5541,10 @@ IntRect combinedScreenRect;
 XMLFile defaultStyle;
 /* readonly */
 float derivedOpacity;
+/* readonly */
+uint dragButtonCombo;
+/* readonly */
+int dragButtonCount;
 uint dragDropMode;
 bool editable;
 bool elementEventSender;
@@ -5512,6 +5572,7 @@ int indentSpacing;
 int indentWidth;
 bool internal;
 IntRect layoutBorder;
+Vector2 layoutFlexScale;
 LayoutMode layoutMode;
 int layoutSpacing;
 int maxHeight;
@@ -6281,15 +6342,25 @@ int weakRefs;
 class ParticleEffect
 {
 // Methods:
+void AddColorFrame(ColorFrame);
+void AddColorTime(Color&, float);
+void AddTextureFrame(TextureFrame);
+void AddTextureTime(Rect&, float);
 ColorFrame GetColorFrame(uint) const;
 TextureFrame GetTextureFrame(uint) const;
 bool Load(File);
 bool Load(VectorBuffer&);
+bool Load(const XMLElement&);
+void RemoveColorFrame(uint);
+void RemoveTextureFrame(uint);
 bool Save(File) const;
 bool Save(VectorBuffer&) const;
+bool Save(XMLElement&) const;
 void SendEvent(const String&, VariantMap& = VariantMap ( ));
-void SetColorFrame(uint, ColorFrame) const;
-void SetTextureFrame(uint, TextureFrame) const;
+void SetColorFrame(uint, ColorFrame);
+void SetTextureFrame(uint, TextureFrame);
+void SortColorFrames();
+void SortTextureFrames();
 
 // Properties:
 float activeTime;
@@ -6306,7 +6377,7 @@ float inactiveTime;
 Material material;
 Vector3 maxDirection;
 float maxEmissionRate;
-Vector3 maxParticleSize;
+Vector2 maxParticleSize;
 float maxRotation;
 float maxRotationSpeed;
 float maxTimeToLive;
@@ -6321,10 +6392,8 @@ float minRotationSpeed;
 float minTimeToLive;
 float minVelocity;
 String name;
-/* readonly */
 uint numColorFrames;
 uint numParticles;
-/* readonly */
 uint numTextureFrames;
 /* readonly */
 int refs;
@@ -6450,6 +6519,7 @@ bool occluder;
 int refs;
 bool relative;
 bool scaled;
+bool serializeParticles;
 float shadowDistance;
 uint shadowMask;
 bool sorted;
@@ -6522,7 +6592,6 @@ bool inView;
 int layer;
 uint lightMask;
 float lodBias;
-Material material;
 uint maxLights;
 /* readonly */
 Node node;
@@ -6538,6 +6607,7 @@ float shadowDistance;
 uint shadowMask;
 Sprite2D sprite;
 bool temporary;
+Texture2D texture;
 /* readonly */
 StringHash type;
 /* readonly */
@@ -6558,6 +6628,7 @@ bool alphaMask;
 BlendMode blendMode;
 CompareMode depthTestMode;
 bool depthWrite;
+bool desktop;
 PassLightingMode lightingMode;
 String pixelShader;
 String pixelShaderDefines;
@@ -6649,6 +6720,7 @@ Vector3 gravity;
 uint id;
 bool internalEdge;
 bool interpolation;
+int maxSubSteps;
 /* readonly */
 Node node;
 /* readonly */
@@ -6846,6 +6918,7 @@ void Define(const Vector3&, const Vector3&);
 float Distance(const Vector3&) const;
 float HitDistance(const BoundingBox&) const;
 float HitDistance(const Frustum&, bool = true) const;
+float HitDistance(const Plane&) const;
 float HitDistance(const Sphere&) const;
 float HitDistance(const Vector3&, const Vector3&, const Vector3&) const;
 Vector3 Project(const Vector3&) const;
@@ -7803,6 +7876,10 @@ IntRect combinedScreenRect;
 XMLFile defaultStyle;
 /* readonly */
 float derivedOpacity;
+/* readonly */
+uint dragButtonCombo;
+/* readonly */
+int dragButtonCount;
 uint dragDropMode;
 bool editable;
 /* readonly */
@@ -7831,6 +7908,7 @@ int indentSpacing;
 int indentWidth;
 bool internal;
 IntRect layoutBorder;
+Vector2 layoutFlexScale;
 LayoutMode layoutMode;
 int layoutSpacing;
 int maxHeight;
@@ -7963,6 +8041,8 @@ Array<Variant> attributeDefaults;
 /* readonly */
 Array<AttributeInfo> attributeInfos;
 Array<Variant> attributes;
+bool autoDisableChildren;
+float autoDisableThreshold;
 /* readonly */
 StringHash baseType;
 bool bringToBack;
@@ -7986,6 +8066,10 @@ UIElement contentElement;
 XMLFile defaultStyle;
 /* readonly */
 float derivedOpacity;
+/* readonly */
+uint dragButtonCombo;
+/* readonly */
+int dragButtonCount;
 uint dragDropMode;
 bool editable;
 bool elementEventSender;
@@ -8012,6 +8096,7 @@ int indentSpacing;
 int indentWidth;
 bool internal;
 IntRect layoutBorder;
+Vector2 layoutFlexScale;
 LayoutMode layoutMode;
 int layoutSpacing;
 int maxHeight;
@@ -8348,6 +8433,10 @@ IntRect combinedScreenRect;
 XMLFile defaultStyle;
 /* readonly */
 float derivedOpacity;
+/* readonly */
+uint dragButtonCombo;
+/* readonly */
+int dragButtonCount;
 uint dragDropMode;
 bool editable;
 bool elementEventSender;
@@ -8377,6 +8466,7 @@ bool internal;
 /* readonly */
 BorderImage knob;
 IntRect layoutBorder;
+Vector2 layoutFlexScale;
 LayoutMode layoutMode;
 int layoutSpacing;
 int maxHeight;
@@ -8658,7 +8748,7 @@ bool playing;
 int refs;
 /* readonly */
 Sound sound;
-SoundType soundType;
+String soundType;
 bool temporary;
 /* readonly */
 float timePosition;
@@ -8741,7 +8831,7 @@ int refs;
 float rolloffFactor;
 /* readonly */
 Sound sound;
-SoundType soundType;
+String soundType;
 bool temporary;
 /* readonly */
 float timePosition;
@@ -8950,6 +9040,10 @@ Array<Color> colors;
 XMLFile defaultStyle;
 /* readonly */
 float derivedOpacity;
+/* readonly */
+uint dragButtonCombo;
+/* readonly */
+int dragButtonCount;
 bool elementEventSender;
 int height;
 HorizontalAlignment horizontalAlignment;
@@ -9294,7 +9388,6 @@ bool inView;
 int layer;
 uint lightMask;
 float lodBias;
-Material material;
 uint maxLights;
 /* readonly */
 Node node;
@@ -9310,6 +9403,7 @@ float shadowDistance;
 uint shadowMask;
 Sprite2D sprite;
 bool temporary;
+Texture2D texture;
 /* readonly */
 StringHash type;
 /* readonly */
@@ -9394,6 +9488,8 @@ class Technique
 {
 // Methods:
 Pass CreatePass(StringHash);
+Pass GetPass(StringHash);
+Pass GetSupportedPass(StringHash);
 bool HasPass(StringHash) const;
 bool Load(File);
 bool Load(VectorBuffer&);
@@ -9407,14 +9503,21 @@ void SendEvent(const String&, VariantMap& = VariantMap ( ));
 StringHash baseType;
 /* readonly */
 String category;
+bool desktop;
 /* readonly */
 uint memoryUse;
 String name;
+/* readonly */
+uint numPasses;
+/* readonly */
+Array<StringHash> passTypes;
 /* readonly */
 Array<Pass> passes;
 /* readonly */
 int refs;
 bool sm3;
+/* readonly */
+bool supported;
 /* readonly */
 StringHash type;
 /* readonly */
@@ -9702,6 +9805,10 @@ IntRect combinedScreenRect;
 XMLFile defaultStyle;
 /* readonly */
 float derivedOpacity;
+/* readonly */
+uint dragButtonCombo;
+/* readonly */
+int dragButtonCount;
 uint dragDropMode;
 bool editable;
 Color effectColor;
@@ -9732,6 +9839,7 @@ int indentSpacing;
 int indentWidth;
 bool internal;
 IntRect layoutBorder;
+Vector2 layoutFlexScale;
 LayoutMode layoutMode;
 int layoutSpacing;
 int maxHeight;
@@ -10288,7 +10396,6 @@ Array<Variant> attributes;
 StringHash baseType;
 /* readonly */
 String category;
-/* writeonly */
 int drawOrder;
 bool enabled;
 /* readonly */
@@ -10310,8 +10417,6 @@ uint numObjects;
 ObjectAnimation objectAnimation;
 /* readonly */
 int refs;
-/* readonly */
-int rrawOrder;
 bool temporary;
 /* readonly */
 StringHash type;
@@ -10372,6 +10477,8 @@ uint frameNumber;
 int refs;
 /* readonly */
 uint systemTime;
+/* readonly */
+uint timeSinceEpoch;
 /* readonly */
 String timeStamp;
 /* readonly */
@@ -10520,6 +10627,10 @@ XMLFile defaultStyle;
 float delay;
 /* readonly */
 float derivedOpacity;
+/* readonly */
+uint dragButtonCombo;
+/* readonly */
+int dragButtonCount;
 uint dragDropMode;
 bool editable;
 bool elementEventSender;
@@ -10544,6 +10655,7 @@ int indentSpacing;
 int indentWidth;
 bool internal;
 IntRect layoutBorder;
+Vector2 layoutFlexScale;
 LayoutMode layoutMode;
 int layoutSpacing;
 int maxHeight;
@@ -10611,6 +10723,7 @@ void DebugDraw(UIElement);
 UIElement GetElementAt(const IntVector2&, bool = true);
 UIElement GetElementAt(int, int, bool = true);
 bool HasModalElement() const;
+bool IsDragging() const;
 UIElement LoadLayout(File);
 UIElement LoadLayout(File, XMLFile);
 UIElement LoadLayout(VectorBuffer&);
@@ -10621,6 +10734,7 @@ bool SaveLayout(File, UIElement);
 bool SaveLayout(VectorBuffer&, UIElement);
 void SendEvent(const String&, VariantMap& = VariantMap ( ));
 void SetFocusElement(UIElement, bool = false);
+const Array<UIElement> GetDragElements();
 
 // Properties:
 /* readonly */
@@ -10635,8 +10749,6 @@ float defaultToolTipDelay;
 float doubleClickInterval;
 int dragBeginDistance;
 float dragBeginInterval;
-/* readonly */
-UIElement dragElement;
 UIElement focusElement;
 bool forceAutoHint;
 /* readonly */
@@ -10759,6 +10871,10 @@ IntRect combinedScreenRect;
 XMLFile defaultStyle;
 /* readonly */
 float derivedOpacity;
+/* readonly */
+uint dragButtonCombo;
+/* readonly */
+int dragButtonCount;
 uint dragDropMode;
 bool editable;
 bool elementEventSender;
@@ -10783,6 +10899,7 @@ int indentSpacing;
 int indentWidth;
 bool internal;
 IntRect layoutBorder;
+Vector2 layoutFlexScale;
 LayoutMode layoutMode;
 int layoutSpacing;
 int maxHeight;
@@ -10837,7 +10954,7 @@ bool Load(VectorBuffer&);
 bool Save(File) const;
 bool Save(VectorBuffer&) const;
 void SendEvent(const String&, VariantMap& = VariantMap ( ));
-void SetEventFrame(float, const String&, const Variant&);
+void SetEventFrame(float, const String&, const VariantMap& = VariantMap ( ));
 void SetKeyFrame(float, const Variant&);
 
 // Properties:
@@ -10875,6 +10992,7 @@ VectorBuffer GetBuffer() const;
 float GetFloat() const;
 int GetInt() const;
 RefCounted GetPtr() const;
+ScriptObject GetScriptObject() const;
 StringHash GetStringHash() const;
 uint GetUInt() const;
 Array<Variant> GetVariantVector() const;
@@ -11139,7 +11257,7 @@ void SetSize(int, int);
 bool SetStyle(const String&, XMLFile = null);
 bool SetStyle(const XMLElement&);
 bool SetStyleAuto(XMLFile = null);
-void SetView(Scene, Camera);
+void SetView(Scene, Camera, bool = true);
 void UpdateLayout();
 const Variant& GetVar(const StringHash&);
 
@@ -11177,6 +11295,10 @@ XMLFile defaultStyle;
 Texture2D depthTexture;
 /* readonly */
 float derivedOpacity;
+/* readonly */
+uint dragButtonCombo;
+/* readonly */
+int dragButtonCount;
 uint dragDropMode;
 bool editable;
 bool elementEventSender;
@@ -11204,6 +11326,7 @@ int indentSpacing;
 int indentWidth;
 bool internal;
 IntRect layoutBorder;
+Vector2 layoutFlexScale;
 LayoutMode layoutMode;
 int layoutSpacing;
 int maxHeight;
@@ -11406,6 +11529,10 @@ IntRect combinedScreenRect;
 XMLFile defaultStyle;
 /* readonly */
 float derivedOpacity;
+/* readonly */
+uint dragButtonCombo;
+/* readonly */
+int dragButtonCount;
 uint dragDropMode;
 bool editable;
 bool elementEventSender;
@@ -11432,6 +11559,7 @@ int indentSpacing;
 int indentWidth;
 bool internal;
 IntRect layoutBorder;
+Vector2 layoutFlexScale;
 LayoutMode layoutMode;
 int layoutSpacing;
 int maxHeight;
@@ -11767,6 +11895,20 @@ CMP_GREATER,
 CMP_GREATEREQUAL,
 };
 
+enum CompressedFormat
+{
+CF_NONE,
+CF_RGBA,
+CF_DXT1,
+CF_DXT3,
+CF_DXT5,
+CF_ETC1,
+CF_PVRTC_RGB_2BPP,
+CF_PVRTC_RGBA_2BPP,
+CF_PVRTC_RGB_4BPP,
+CF_PVRTC_RGBA_4BPP,
+};
+
 enum ConstraintType
 {
 CONSTRAINT_POINT,
@@ -11809,13 +11951,17 @@ CULL_CW,
 enum CursorShape
 {
 CS_NORMAL,
+CS_IBEAM,
+CS_CROSS,
 CS_RESIZEVERTICAL,
 CS_RESIZEDIAGONAL_TOPRIGHT,
 CS_RESIZEHORIZONTAL,
 CS_RESIZEDIAGONAL_TOPLEFT,
+CS_RESIZE_ALL,
 CS_ACCEPTDROP,
 CS_REJECTDROP,
 CS_BUSY,
+CS_BUSY_ARROW,
 };
 
 enum DumpMode
@@ -11942,6 +12088,13 @@ LM_FORCE_LOOPED,
 LM_FORCE_CLAMPED,
 };
 
+enum MouseMode
+{
+MM_ABSOLUTE,
+MM_RELATIVE,
+MM_WRAP,
+};
+
 enum Orientation
 {
 O_HORIZONTAL,
@@ -12022,15 +12175,6 @@ SHAPE_CONVEXHULL,
 SHAPE_TERRAIN,
 };
 
-enum SoundType
-{
-SOUND_EFFECT,
-SOUND_AMBIENT,
-SOUND_VOICE,
-SOUND_MUSIC,
-SOUND_MASTER,
-};
-
 enum TextEffect
 {
 TE_NONE,
@@ -12081,6 +12225,7 @@ TU_LIGHTBUFFER,
 TU_VOLUMEMAP,
 TU_ZONE,
 MAX_MATERIAL_TEXTURE_UNITS,
+MAX_NAMED_TEXTURE_UNITS,
 MAX_TEXTURE_UNITS,
 };
 
@@ -12176,6 +12321,7 @@ int Clamp(int, int, int);
 void ClearDelayedExecute(const String& = String ( ));
 VectorBuffer CompressVectorBuffer(VectorBuffer&);
 float Cos(float);
+uint CountSetBits(uint);
 VectorBuffer DecompressVectorBuffer(VectorBuffer&);
 void DelayedExecute(float, bool, const String&);
 void DelayedExecute(float, bool, const String&, const Array<Variant>);
@@ -12337,8 +12483,8 @@ uint DEFAULT_LIGHTMASK;
 uint DEFAULT_VIEWMASK;
 uint DRAWABLE_ANY;
 uint DRAWABLE_GEOMETRY;
+uint DRAWABLE_GEOMETRY2D;
 uint DRAWABLE_LIGHT;
-uint DRAWABLE_PROXYGEOMETRY;
 uint DRAWABLE_ZONE;
 uint FIRST_LOCAL_ID;
 uint FIRST_REPLICATED_ID;
@@ -12746,6 +12892,11 @@ int SHADOWQUALITY_HIGH_16BIT;
 int SHADOWQUALITY_HIGH_24BIT;
 int SHADOWQUALITY_LOW_16BIT;
 int SHADOWQUALITY_LOW_24BIT;
+String SOUND_AMBIENT;
+String SOUND_EFFECT;
+String SOUND_MASTER;
+String SOUND_MUSIC;
+String SOUND_VOICE;
 Color TRANSPARENT;
 uint VO_DISABLE_OCCLUSION;
 uint VO_DISABLE_SHADOWS;

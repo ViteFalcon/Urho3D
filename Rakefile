@@ -36,43 +36,48 @@ end
 desc 'Create a new project using Urho3D as external library'
 task :scaffolding do
   abort 'Usage: rake scaffolding dir=/path/to/new/project/root [project=Scaffolding] [target=Main]' unless ENV['dir']
-  abs_path = ENV['dir'][0, 1] == '/' ? ENV['dir'] : "#{Dir.pwd}/#{ENV['dir']}"
+  abs_path = (ENV['OS'] ? ENV['dir'][1, 1] == ':' : ENV['dir'][0, 1] == '/') ? ENV['dir'] : "#{Dir.pwd}/#{ENV['dir']}"
   project = ENV['project'] || 'Scaffolding'
   target = ENV['target'] || 'Main'
   scaffolding(abs_path, project, target)
   abs_path = Pathname.new(abs_path).realpath
   puts "\nNew project created in #{abs_path}\n\n"
-  puts "To build the new project, you may need to first define and export either 'URHO3D_HOME' or 'CMAKE_PREFIX_PATH' environment variable"
+  puts "To build the new project, you may need to first set and export either 'URHO3D_HOME' or 'CMAKE_PREFIX_PATH' environment variable"
   puts "Please see http://urho3d.github.io/documentation/HEAD/_using_library.html for more detail. For example:\n\n"
-  puts "$ URHO3D_HOME=#{Dir.pwd}; export URHO3D_HOME\n$ cd #{abs_path}\n$ ./cmake_gcc.sh -DURHO3D_LUAJIT=1\n$ cd Build\n$ make\n\n"
+  if ENV['OS']
+    puts "set URHO3D_HOME=#{Dir.pwd}\ncd #{abs_path}\ncmake_vs2013.bat -DURHO3D_64BIT=1 -DURHO3D_LUAJIT=1\n\n"
+  else
+    puts "export URHO3D_HOME=#{Dir.pwd}\ncd #{abs_path}\n./cmake_gcc.sh -DURHO3D_LUAJIT=1\ncd Build\nmake\n\n"
+  end
 end
 
-# Usage: rake android [intent=.SampleLauncher] [package=com.github.urho3d] [success_indicator='Initialized engine'] [payload='input tap 10 200'] [timeout=30] [api=19] [avd=test] [retries=60] [retry_interval=10]
+# Usage: rake android [parameter='--es pickedLibrary Urho3DPlayer'] [intent=.SampleLauncher] [package=com.github.urho3d] [success_indicator='Initialized engine'] [payload='sleep 30'] [api=19] [abi=armeabi-v7a] [avd=test_#{api}_#{abi}] [retries=10] [retry_interval=10]
 desc 'Test run already installed APK in Android (virtual) device, default to Urho3D Samples APK if no parameter is given'
 task :android do
+  parameter = ENV['parameter'] || '--es pickedLibrary Urho3DPlayer'
   intent = ENV['intent'] || '.SampleLauncher'
   package = ENV['package'] || 'com.github.urho3d'
-  success_indicator = ENV['success_indicator'] || (intent == '.SampleLauncher' ? 'Initialized engine' : '')
-  payload = ENV['payload'] || (intent == '.SampleLauncher' ? 'input tap 10 200' : '')
-  timeout = ENV['timeout'] || 30
+  success_indicator = ENV['success_indicator'] || 'Initialized engine'
+  payload = ENV['payload'] || 'sleep 30'
   api = ENV['api'] || 19
-  avd = ENV['avd'] || 'test'
-  retries = ENV['retries'] || 60 # Roughly equals to 10 minutes wait with 10 seconds interval
+  abi = ENV['abi'] || 'armeabi-v7a'
+  avd = ENV['avd'] || "test_#{api}_#{abi}"
+  retries = ENV['retries'] || 10 # minutes
   retry_interval = ENV['retry_interval'] || 10 # seconds
-  android_prepare_device api, avd or abort 'Failed to prepare Android (virtual) device for test run'
+  android_prepare_device api, abi, avd or abort 'Failed to prepare Android (virtual) device for test run'
   android_wait_for_device retries, retry_interval or abort 'Failed to start Android (virtual) device'
-  android_test_run intent, package, success_indicator, payload, timeout or abort "Failed to test run #{package}/#{intent}, make sure the APK has been installed"
+  android_test_run parameter, intent, package, success_indicator, payload or abort "Failed to test run #{package}/#{intent}, make sure the APK has been installed"
 end
 
 # Usage: NOT intended to be used manually (if you insist then try: rake ci)
 desc 'Configure, build, and test Urho3D project'
 task :ci do
   # Unshallow the clone's history when necessary
-  if ENV['CI'] && ENV['PACKAGE_UPLOAD'] && ENV['RELEASE_TAG'].empty?
+  if ENV['CI'] && ENV['PACKAGE_UPLOAD'] && !ENV['RELEASE_TAG']
     system 'git fetch --unshallow' or abort 'Failed to unshallow cloned repository'
   end
-  # Packaging always use Release configuration (temporary workaround due to Travis-CI insufficient memory, also always use Release configuration for MinGW and Android build)
-  if ENV['PACKAGE_UPLOAD'] || (ENV['CI'] && (ENV['WINDOWS'] || ENV['ANDROID']))
+  # Packaging always use Release configuration (temporary workaround due to Travis-CI insufficient memory, also use Release configuration when CI build runs on a bad VM)
+  if ENV['PACKAGE_UPLOAD'] || ENV['BAD_VM']
     $configuration = 'Release'
     $testing = 0
   else
@@ -81,7 +86,10 @@ task :ci do
     $testing = (ENV['LINUX'] && !ENV['URHO3D_64BIT']) || (ENV['OSX'] && ENV['IOS'].to_i != 1) ? 1 : 0
   end
   # Define the build option string only when the override environment variable is given
-  $urho3d_64bit = "-DURHO3D_64BIT=#{ENV['URHO3D_64BIT']}" if ENV['URHO3D_64BIT']
+  $build_options = "-DURHO3D_64BIT=#{ENV['URHO3D_64BIT']}" if ENV['URHO3D_64BIT']
+  $build_options = "#{$build_options} -DURHO3D_OPENGL=#{ENV['URHO3D_OPENGL']}" if ENV['URHO3D_OPENGL']
+  $build_options = "#{$build_options} -DANDROID_ABI=#{ENV['ABI']}" if ENV['ABI']
+  $build_options = "#{$build_options} -DANDROID_NATIVE_API_LEVEL=#{ENV['API']}" if ENV['API']
   if ENV['XCODE']
     # xctool or xcodebuild
     xcode_ci
@@ -101,7 +109,7 @@ task :ci_site_update do
   # Setup doxygen to use minimal theme
   system "ruby -i -pe 'BEGIN { a = {%q{HTML_HEADER} => %q{minimal-header.html}, %q{HTML_FOOTER} => %q{minimal-footer.html}, %q{HTML_STYLESHEET} => %q{minimal-doxygen.css}, %q{HTML_COLORSTYLE_HUE} => 200, %q{HTML_COLORSTYLE_SAT} => 0, %q{HTML_COLORSTYLE_GAMMA} => 20, %q{DOT_IMAGE_FORMAT} => %q{svg}, %q{INTERACTIVE_SVG} => %q{YES}} }; a.each {|k, v| gsub(/\#{k}\s*?=.*?\n/, %Q{\#{k} = \#{v}\n}) }' Docs/Doxyfile" or abort 'Failed to setup doxygen configuration file'
   system 'cp doc-Build/_includes/Doxygen/minimal-* Docs' or abort 'Failed to copy minimal-themed template'
-  release = ENV['RELEASE_TAG'].empty? ? 'HEAD' : ENV['RELEASE_TAG'];
+  release = ENV['RELEASE_TAG'] || 'HEAD'
   unless release == 'HEAD'
     system "mkdir -p doc-Build/documentation/#{release}" or abort 'Failed to create directory for new document version'
     system "ruby -i -pe 'gsub(/HEAD/, %q{#{release}})' Docs/minimal-header.html" or abort 'Failed to update document version in YAML Front Matter block'
@@ -117,21 +125,28 @@ task :ci_site_update do
   else
     instruction = 'package'
   end
-  # Supply GIT credentials and push API documentation to urho3d/Urho3D.git (the push may not be successful if detached HEAD is not a fast forward of remote master)
-  system 'pwd && git config user.name $GIT_NAME && git config user.email $GIT_EMAIL && git remote set-url --push origin https://$GH_TOKEN@github.com/$TRAVIS_REPO_SLUG.git && git add Docs/*API*'
-  if system("git commit -q -m 'Travis CI: API documentation update at #{Time.now.utc}.\n[ci #{instruction}]'") && !ENV['PACKAGE_UPLOAD']
-    bump_soversion 'Source/Engine/.soversion' or abort 'Failed to bump soversion'
-    system "git add Source/Engine/.soversion && git commit --amend -q -m 'Travis CI: API documentation update at #{Time.now.utc}.\n[ci #{instruction}]'" or abort 'Failed to stage .soversion file'
+  if !ENV['RELEASE_TAG']
+    # Supply GIT credentials and push API documentation to urho3d/Urho3D.git (the push may not be successful if remote master has already diverged)
+    system 'pwd && git config user.name $GIT_NAME && git config user.email $GIT_EMAIL && git remote set-url --push origin https://$GH_TOKEN@github.com/$TRAVIS_REPO_SLUG.git && git add Docs/*API*'
+    if system("git commit -q -m 'Travis CI: API documentation update at #{Time.now.utc}.\n[ci #{instruction}]'") && !ENV['PACKAGE_UPLOAD']
+      bump_soversion 'Source/Engine/.soversion' or abort 'Failed to bump soversion'
+      system "git add Source/Engine/.soversion && git commit --amend -q -m 'Travis CI: API documentation update at #{Time.now.utc}.\n[ci #{instruction}]'" or abort 'Failed to stage .soversion file'
+    end
+    system "git push origin HEAD:master -q >/dev/null 2>&1" or abort 'Failed to update API documentation, most likely due to remote master has diverged, the API documentation update will be performed again in the subsequent CI build'
   end
-  system "git push origin HEAD:master -q >/dev/null 2>&1" or abort 'Failed to update API documentation, most likely due to remote master has diverged, the API documentation update will be performed again in the subsequent CI build'
 end
 
-# Usage: NOT intended to be used manually (if you insist then try: GIT_NAME=... GIT_EMAIL=... GH_TOKEN=... rake ci_rebase)
-desc 'Rebase Android-CI and OSX-CI mirror branches'
+# Usage: NOT intended to be used manually (if you insist then try: GIT_NAME=... GIT_EMAIL=... GH_TOKEN=... TRAVIS_BRANCH=... rake ci_rebase)
+desc 'Rebase all CI mirror branches'
 task :ci_rebase do
-  system 'git config user.name $GIT_NAME && git config user.email $GIT_EMAIL && git remote set-url --push origin https://$GH_TOKEN@github.com/$TRAVIS_REPO_SLUG.git && git fetch origin Android-CI:Android-CI && git rebase origin/master Android-CI && git push -qf -u origin Android-CI >/dev/null 2>&1' or abort 'Failed to rebase Android-CI mirror branch'
-  system 'git config user.name $GIT_NAME && git config user.email $GIT_EMAIL && git remote set-url --push origin https://$GH_TOKEN@github.com/$TRAVIS_REPO_SLUG.git && git fetch origin RPI-CI:RPI-CI && git rebase origin/master RPI-CI && git push -qf -u origin RPI-CI >/dev/null 2>&1' or abort 'Failed to rebase RPI-CI mirror branch'
-  system 'git config user.name $GIT_NAME && git config user.email $GIT_EMAIL && git remote set-url --push origin https://$GH_TOKEN@github.com/$TRAVIS_REPO_SLUG.git && git fetch origin OSX-CI:OSX-CI && git rebase origin/master OSX-CI && git push -qf -u origin OSX-CI >/dev/null 2>&1' or abort 'Failed to rebase OSX-CI mirror branch'
+  system 'git config user.name $GIT_NAME && git config user.email $GIT_EMAIL && git remote set-url --push origin https://$GH_TOKEN@github.com/$TRAVIS_REPO_SLUG.git'
+  baseline = ENV['RELEASE_TAG'] || "origin/#{ENV['TRAVIS_BRANCH']}"
+  enable = /\[ci rebase\]/ =~ ENV['COMMIT_MESSAGE']
+  [ 'Android-CI', 'RPI-CI', 'OSX-CI' ].each { |ci| ci_branch = ENV['RELEASE_TAG'] || ENV['TRAVIS_BRANCH'] == 'master' ? ci : "#{ENV['TRAVIS_BRANCH']}-#{ci}"; system "if git fetch origin #{ci_branch}:#{ci_branch} 2>/dev/null; then git rebase #{baseline} #{ci_branch} && git push -qf -u origin #{ci_branch} >/dev/null 2>&1; elif [ #{enable} ]; then git checkout -b #{ci_branch} #{ENV['TRAVIS_BRANCH']} && rm .travis.yml && wget -q https://raw.githubusercontent.com/#{ENV['TRAVIS_REPO_SLUG']}/#{ci}/.travis.yml && cat <<EOF >README.md && git add -A . && git commit -m 'For Travis CI - switch CI build to use #{ci.split('-').first} build environment.' && git push -qf -u origin #{ci_branch} >/dev/null 2>&1; fi
+This is a mirror branch which is constantly being \"rebased\" from #{ENV['TRAVIS_BRANCH']} branch. Please DO NOT checkout from this mirror branch! The purpose of this mirror branch is to perform CI build using #{ci.split('-').first} build environment on Travis-CI.org. See #{ENV['TRAVIS_BRANCH']} branch for CI build result using Ubuntu Linux build environment.
+
+[![Build Status](https://travis-ci.org/#{ENV['TRAVIS_REPO_SLUG']}.png?branch=#{ci_branch})](https://travis-ci.org/#{ENV['TRAVIS_REPO_SLUG']}?branch=#{ci_branch})
+EOF" or abort "Failed to rebase #{ci_branch} mirror branch" }
 end
 
 # Usage: NOT intended to be used manually (if you insist then try: rake ci_package_upload)
@@ -164,7 +179,11 @@ task :ci_package_upload do
   # Make the package
   if ENV['IOS']
     # Skip Mach-O universal binary build if Travis-CI VM took too long to get here, as otherwise overall build time may exceed 50 minutes time limit
-    if !ENV['CI_START_TIME'] || (Time.now - Time.parse(ENV['CI_START_TIME'])) / 60 < 20 # minutes
+    if ENV['CI_START_TIME'] then
+      elapsed_time = (Time.now - Time.parse(ENV['CI_START_TIME'])) / 60
+      puts "\niOS checkpoint reached, elapsed time: #{elapsed_time}\n\n"
+    end
+    if !ENV['CI_START_TIME'] || elapsed_time < 15 # minutes
       # Build Mach-O universal binary consisting of iphoneos (universal ARM archs including 'arm64' if 64-bit is enabled) and iphonesimulator (i386 arch and also x86_64 arch if 64-bit is enabled)
       system 'echo Rebuild Urho3D library as Mach-O universal binary'
       xcode_build(0, "#{platform_prefix}Build/Urho3D.xcodeproj", 'Urho3D_universal') or abort 'Failed to build Mach-O universal binary'
@@ -174,17 +193,14 @@ task :ci_package_upload do
   elsif ENV['XCODE']
     xcode_build(ENV['IOS'], "#{platform_prefix}Build/Urho3D.xcodeproj", 'package') or abort 'Failed to make binary package'
   else
-    if ENV['ANDROID']
-      # Build Android package consisting of both armeabi-v7a and armeabi ABIs
-      system 'echo Reconfigure and rebuild Urho3D project using armeabi ABI'
-      system "SKIP_NATIVE=1 ./cmake_gcc.sh -DANDROID_ABI=armeabi && cd #{platform_prefix}Build && make -j$NUMJOBS" or abort 'Failed to reconfigure and rebuild for armeabi'
+    if ENV['ANDROID'] && !ENV['NO_SDK_SYSIMG']
       system "cd #{platform_prefix}Build && android update project -p . -t $( android list target |grep android-$API |cut -d ' ' -f2 ) && ant debug" or abort 'Failed to make Urho3D Samples APK'
     end
     system "cd #{platform_prefix}Build && make package" or abort 'Failed to make binary package'
   end
   # Determine the upload location
   setup_digital_keys
-  if ENV['RELEASE_TAG'].empty?
+  if !ENV['RELEASE_TAG']
     upload_dir = "/home/frs/project/#{ENV['TRAVIS_REPO_SLUG']}/Snapshots"
     if ENV['SITE_UPDATE']
       # Download source packages from GitHub
@@ -221,7 +237,8 @@ EOF" or abort 'Failed to create release directory remotely'
 end
 
 def scaffolding(dir, project = 'Scaffolding', target = 'Main')
-  system "bash -c \"mkdir -p #{dir}/{Source,Bin} && cp Source/Tools/Urho3DPlayer/Urho3DPlayer.* #{dir}/Source && for f in {.,}*.sh; do ln -sf `pwd`/\\$f #{dir}; done && ln -sf `pwd`/Bin/{Core,}Data #{dir}/Bin\" && cat <<EOF >#{dir}/Source/CMakeLists.txt
+  path_suffix = ENV['OS'] ? '' : 'Urho3D/'
+  build_script = <<EOF
 # Set project name
 project (#{project})
 
@@ -241,8 +258,9 @@ endif ()
 
 # Set CMake modules search path
 set (CMAKE_MODULE_PATH
-    \\$ENV{URHO3D_HOME}/Source/CMake/Modules
-    \\$ENV{CMAKE_PREFIX_PATH}/share/Urho3D/CMake/Modules
+    $ENV{URHO3D_HOME}/Source/CMake/Modules
+    $ENV{CMAKE_PREFIX_PATH}/share/#{path_suffix}CMake/Modules
+    ${CMAKE_INSTALL_PREFIX}/share/#{path_suffix}CMake/Modules
     CACHE PATH \"Path to Urho3D-specific CMake modules\")
 
 # Include Urho3D CMake common module
@@ -250,7 +268,7 @@ include (Urho3D-CMake-common)
 
 # Find Urho3D library
 find_package (Urho3D REQUIRED)
-include_directories (\\${URHO3D_INCLUDE_DIRS})
+include_directories (${URHO3D_INCLUDE_DIRS})
 
 # Define target name
 set (TARGET_NAME #{target})
@@ -263,37 +281,52 @@ setup_main_executable ()
 
 # Setup test cases
 if (URHO3D_ANGELSCRIPT)
-    add_test (NAME ExternalLibAS COMMAND \\${TARGET_NAME} Data/Scripts/12_PhysicsStressTest.as -w -timeout \\${URHO3D_TEST_TIME_OUT})
+    add_test (NAME ExternalLibAS COMMAND ${TARGET_NAME} Data/Scripts/12_PhysicsStressTest.as -w -timeout ${URHO3D_TEST_TIME_OUT})
 endif ()
 if (URHO3D_LUA)
-    add_test (NAME ExternalLibLua COMMAND \\${TARGET_NAME} Data/LuaScripts/12_PhysicsStressTest.lua -w -timeout \\${URHO3D_TEST_TIME_OUT})
+    add_test (NAME ExternalLibLua COMMAND ${TARGET_NAME} Data/LuaScripts/12_PhysicsStressTest.lua -w -timeout ${URHO3D_TEST_TIME_OUT})
 endif ()
-EOF" or abort 'Failed to create new project using Urho3D as external library'
+EOF
+  # TODO: Rewrite in pure Ruby when it supports symlink creation on Windows platform
+  if ENV['OS']
+    system("@echo off && (for %d in (Source,Bin) do mkdir #{dir}\\%d) && copy Source\\Tools\\Urho3DPlayer\\Urho3DPlayer.* #{dir}\\Source >nul && (for %f in (*.bat Rakefile) do mklink #{dir}\\%f %cd%\\%f >nul) && (for %d in (CoreData,Data) do mklink /D #{dir}\\Bin\\%d %cd%\\Bin\\%d >nul)") && File.write("#{dir}/Source/CMakeLists.txt", build_script) or abort 'Failed to create new project using Urho3D as external library'
+  else
+    system("bash -c \"mkdir -p #{dir}/{Source,Bin} && cp Source/Tools/Urho3DPlayer/Urho3DPlayer.* #{dir}/Source && for f in {.,}*.sh Rakefile; do ln -sf `pwd`/\\$f #{dir}; done && ln -sf `pwd`/Bin/{Core,}Data #{dir}/Bin\"") && File.write("#{dir}/Source/CMakeLists.txt", build_script) or abort 'Failed to create new project using Urho3D as external library'
+  end
 end
 
 def makefile_ci
   if ENV['WINDOWS']
+    # MinGW package on Ubuntu 12.04 LTS does not come with d3dcompiler.h file which is required by our CI build with URHO3D_OPENGL=0.
+    # Temporarily workaround the problem by downloading the missing header from Ubuntu 14.04 LTS source package.
+    if ENV['URHO3D_OPENGL'] && ENV['CI'] then
+      system "sudo wget -P $(echo |$MINGW_PREFIX-gcc -v -E - 2>&1 |grep -B 1 'End of search list' |head -1) http://bazaar.launchpad.net/~ubuntu-branches/ubuntu/trusty/mingw-w64/trusty/download/package-import%40ubuntu.com-20130624192537-vzn12bb7qd5w3iy8/d3dcompiler.h-20120402093420-bk10a737hzitlkgj-65/d3dcompiler.h" or abort 'Failed to download d3dcompiler.h header'
+    end
     # LuaJIT on MinGW build is not possible on Ubuntu 12.04 LTS as its GCC cross-compiler version is too old. Fallback to use Lua library instead.
     jit = ''
     amalg = ''
     # Lua on MinGW build requires tolua++ tool to be built natively first
-    system "MINGW_PREFIX= ./cmake_gcc.sh -DURHO3D_LIB_TYPE=$URHO3D_LIB_TYPE #{$urho3d_64bit} -DURHO3D_LUA=1 -DURHO3D_TOOLS=0" or abort 'Failed to configure native build for tolua++ target'
+    system "MINGW_PREFIX= ./cmake_gcc.sh -DURHO3D_LIB_TYPE=$URHO3D_LIB_TYPE #{$build_options} -DURHO3D_LUA=1 -DURHO3D_TOOLS=0" or abort 'Failed to configure native build for tolua++ target'
     system "cd Build/ThirdParty/toluapp/src/bin && make -j$NUMJOBS" or abort 'Failed to build tolua++ tool'
     ENV['SKIP_NATIVE'] = '1'
+  elsif ENV['ANDROID'] && ENV['ABI'] == 'arm64-v8a'
+    # The upstream LuaJIT library does not support this Android ABI at the moment, fallback to use Lua library instead
+    jit = ''
+    amalg = ''
   else
     jit = 'JIT'
     amalg = '-DURHO3D_LUAJIT_AMALG=1'
   end
-  system "./cmake_gcc.sh -DURHO3D_LIB_TYPE=$URHO3D_LIB_TYPE #{$urho3d_64bit} -DURHO3D_LUA#{jit}=1 #{amalg} -DURHO3D_SAMPLES=1 -DURHO3D_TOOLS=1 -DURHO3D_EXTRAS=1 -DURHO3D_TESTING=#{$testing} -DCMAKE_BUILD_TYPE=#{$configuration}" or abort 'Failed to configure Urho3D library build'
+  system "./cmake_gcc.sh -DURHO3D_LIB_TYPE=$URHO3D_LIB_TYPE #{$build_options} -DURHO3D_LUA#{jit}=1 #{amalg} -DURHO3D_SAMPLES=1 -DURHO3D_TOOLS=1 -DURHO3D_EXTRAS=1 -DURHO3D_TESTING=#{$testing} -DCMAKE_BUILD_TYPE=#{$configuration}" or abort 'Failed to configure Urho3D library build'
   if ENV['ANDROID']
-    # The AVD on Travis-CI does not have enough memory for STATIC lib installation, so only prepare device for SHARED lib test run
-    android_test = !ENV['PACKAGE_UPLOAD'] && (ENV['URHO3D_LIB_TYPE'] == 'SHARED' || !ENV['CI'])
-    if android_test
-      android_prepare_device ENV['API'] or abort 'Failed to prepare Android (virtual) device for test run'
+    if ENV['AVD'] && !ENV['PACKAGE_UPLOAD']   # Skip APK test run when packaging
+      android_prepare_device ENV['API'], ENV['ABI'], ENV['AVD'] or abort 'Failed to prepare Android (virtual) device for test run'
     end
     # LuaJIT on Android build requires tolua++ and buildvm-android tools to be built natively first
     system "cd Build/ThirdParty/toluapp/src/bin && make -j$NUMJOBS" or abort 'Failed to build tolua++ tool'
-    system "cd Build/ThirdParty/LuaJIT/generated/buildvm-android && make -j$NUMJOBS" or abort 'Failed to build buildvm-android tool'
+    if !jit.empty?
+      system "cd Build/ThirdParty/Lua#{jit}/generated/buildvm-android-#{ENV['ABI']} && make -j$NUMJOBS" or abort 'Failed to build buildvm-android tool'
+    end
     # Reconfigure Android build one more time now that we have the tools built
     ENV['SKIP_NATIVE'] = '1'
     system './cmake_gcc.sh' or abort 'Failed to reconfigure Urho3D library for Android build'
@@ -319,53 +352,83 @@ def makefile_ci
   system "cd #{platform_prefix}Build && make -j$NUMJOBS #{test}" or abort 'Failed to build or test Urho3D library'
   # Create a new project on the fly that uses newly built Urho3D library
   scaffolding "#{platform_prefix}Build/generated/externallib"
-  system "URHO3D_HOME=`pwd`; export URHO3D_HOME && cd #{platform_prefix}Build/generated/externallib && echo '\nUsing Urho3D as external library in external project' && ./cmake_gcc.sh #{$urho3d_64bit} -DURHO3D_LUA#{jit}=1 -DURHO3D_TESTING=#{$testing} -DCMAKE_BUILD_TYPE=#{$configuration} && cd #{platform_prefix}Build && make -j$NUMJOBS #{test}" or abort 'Failed to configure/build/test temporary project using Urho3D as external library' 
+  system "URHO3D_HOME=`pwd`; export URHO3D_HOME && cd #{platform_prefix}Build/generated/externallib && echo '\nUsing Urho3D as external library in external project' && ./cmake_gcc.sh #{$build_options} -DURHO3D_LUA#{jit}=1 -DURHO3D_TESTING=#{$testing} -DCMAKE_BUILD_TYPE=#{$configuration} && cd #{platform_prefix}Build && make -j$NUMJOBS #{test}" or abort 'Failed to configure/build/test temporary project using Urho3D as external library' 
   # Make, deploy, and test run Android APK in an Android (virtual) device
-  if android_test
+  if ENV['AVD'] && !ENV['PACKAGE_UPLOAD']
     system "cd #{platform_prefix}Build && android update project -p . -t $( android list target |grep android-$API |cut -d ' ' -f2 ) && ant debug" or abort 'Failed to make Urho3D Samples APK'
-    android_wait_for_device # We either success or die trying, killed by Travis-CI due 10 minutes no-output timeout which is perfect for this case
-    system "cd #{platform_prefix}Build && ant installd" or abort 'Failed to deploy Urho3D Samples APK'
-    android_test_run or abort 'Failed to test run Urho3D Samples APK'
+    if android_wait_for_device ENV['CI'] ? 1 : 10 # minutes
+      system "cd #{platform_prefix}Build && ant -Dadb.device.arg='-s #{$specific_device}' installd" or abort 'Failed to deploy Urho3D Samples APK'
+      android_test_run or abort 'Failed to test run Urho3D Samples APK'
+    else
+      puts 'Skipped test running Urho3D Samples APK as emulator failed to start in time'
+    end
   end
 end
 
-def android_prepare_device api, name = 'test'
+def android_find_device api = nil, abi = nil
+  # Return the previously found matching device or if not found yet then try to find the matching device now
+  return $specific_device if $specific_device
+  wait = api ? '' : 'wait-for-device'
+  $specific_api = api.to_s if api
+  $specific_abi = abi.to_s if abi
+  for i in `adb #{wait} devices |tail -n +2`.split "\n"
+    device = i.split.first
+    if `adb -s #{device} wait-for-device shell getprop ro.build.version.sdk`.chomp == $specific_api && `adb -s #{device} shell getprop ro.product.cpu.abi`.chomp == $specific_abi
+      return $specific_device = device
+    end
+  end
+  nil
+end
+
+def android_prepare_device api, abi = 'armeabi-v7a', name = 'test'
   system 'if ! ps |grep -cq adb; then adb start-server; fi'
-  if `adb devices |tail -n +2 |head -1`.chomp.empty?
-    # Don't have any (virtual) device attached, try to attach the named device (create the named device as AVD if necessary)
+  if !android_find_device api, abi
+    # Don't have any matching (virtual) device attached, try to attach the named device (create the named device as AVD if necessary)
     if !system "android list avd |grep -cq 'Name: #{name}$'"
-      system "echo 'no' |android create avd -n #{name} -t android-#{api}" or abort "Failed to create '#{name}' Android virtual device"
+      system "echo 'no' |android create avd -n #{name} -t android-#{api} --abi #{abi}" or abort "Failed to create '#{name}' Android virtual device"
     end
     system "if [ $CI ]; then export OPTS='-no-skin -no-audio -no-window -no-boot-anim -gpu off'; else export OPTS='-gpu on'; fi; emulator -avd #{name} $OPTS &"
   end
-  return 0;
+  return 0
 end
 
-def android_wait_for_device retries = -1, retry_interval = 10, package = 'com.android.launcher'
-  # Wait until the indicator process is running or it is killed externally by Travis-CI or by user via Ctrl+C or when it exceeds the number of retries (if given)
-  puts "\nWaiting for device...\n\n"
-  # Capture adb's stdout and interpret it because adb does not return exit code from its last shell command
-  return /timeout/ =~ `adb wait-for-device shell 'retries=#{retries}; until [ $retries -eq 0 ] || ps |grep -c #{package} 1>/dev/null; do sleep #{retry_interval}; if [ $retries -gt 0 ]; then let retries=retries-1; fi; done; if [ $retries -eq 0 ]; then echo timeout; else while ps |grep -c bootanimation 1>/dev/null; do sleep 1; done; fi'` ? nil : 0;
+def android_wait_for_device retries = -1, retry_interval = 10, package = 'android.process.acore'  # Waiting for HOME by default
+  # Wait until the indicator process is running or it is killed externally by user via Ctrl+C or when it exceeds the number of retries (if the retries parameter is provided)
+  str = "\nWaiting for device..."
+  thread = Thread.new { android_find_device }; sleep 0.5
+  process_ready = false
+  retries = retries * 60 / retry_interval unless retries == -1
+  until retries == 0
+    if thread.status == false
+      thread.join
+      break if process_ready
+      process_ready = thread = Thread.new { `adb -s #{$specific_device} shell 'until ps |grep -c #{package} >/dev/null; do sleep #{retry_interval}; done; while ps |grep -c bootanimation >/dev/null; do sleep 1; done'` }; sleep 0.5
+      next
+    end
+    print str; str = '.'; $stdout.flush   # Flush the standard output stream in case it is buffered to prevent Travis-CI into thinking that the build/test has stalled
+    sleep retry_interval
+    retries -= 1 if retries > 0
+  end
+  puts "\n\n" if str == '.'; $stdout.flush
+  return retries == 0 ? nil : 0
 end
 
-def android_test_run intent = '.SampleLauncher', package = 'com.github.urho3d', success_indicator = 'Added resource path /apk/CoreData/', payload = 'input tap 10 200', timeout = 30
+def android_test_run parameter = '--es pickedLibrary Urho3DPlayer', intent = '.SampleLauncher', package = 'com.github.urho3d', success_indicator = 'Added resource path /apk/CoreData/', payload = 'sleep 30'
+  # The device should have been found at this point
+  return nil unless $specific_device
   # Capture adb's stdout and interpret it because adb neither uses stderr nor returns proper exit code on error
   begin
-    IO.popen("adb shell <<EOF
+    IO.popen("adb -s #{$specific_device} shell <<EOF
 # Try to unlock the device just in case it is locked
 input keyevent 82; input keyevent 4
 # Clear the log
 logcat -c
 # Start the app
-am start -a android.intent.action.MAIN -n #{package}/#{intent}
+am start -a android.intent.action.MAIN -n #{package}/#{intent} #{parameter}
 # Wait until the process is running
 until ps |grep -c #{package} 1>/dev/null; do sleep 1; done
-# Make sure the app is on the foreground
-sleep 3 && am start -n #{package}/#{intent} && sleep 3
-# Execute the payload, the default payload is a single tap to launch Urho3DPlayer which in turn runs NinjaSnowWar.as
+# Execute the payload
 #{payload}
-# Let it runs for a while
-sleep #{timeout}
 # Exit and stop the app
 input keyevent 4 && am force-stop #{package}
 # Dump the log
@@ -375,7 +438,7 @@ exit
 ##
 EOF") { |stdout| echo = false; while output = stdout.gets do if echo && /#\s#/ !~ output then puts output else echo = true if /^##/ =~ output end; return nil if /^error/i =~ output end }
     # Result of the test run is determined based on the presence of the success indicator string in the log
-    system "adb logcat -d |grep -cq '#{success_indicator}'"
+    system "adb -s #{$specific_device} logcat -d |grep -cq '#{success_indicator}'"
   rescue
     nil
   end
@@ -389,7 +452,7 @@ def xcode_ci
     platform_prefix = 'ios-'
     deployment_target = "-DIPHONEOS_DEPLOYMENT_TARGET=#{ENV['DEPLOYMENT_TARGET']}"
     # Lua on IOS build requires tolua++ tool to be built natively first
-    system "./cmake_macosx.sh -DURHO3D_LIB_TYPE=$URHO3D_LIB_TYPE #{$urho3d_64bit} -DURHO3D_LUA=1 -DURHO3D_TOOLS=0" or abort 'Failed to configure native build for tolua++ target'
+    system "./cmake_macosx.sh -DURHO3D_LIB_TYPE=$URHO3D_LIB_TYPE #{$build_options} -DURHO3D_LUA=1 -DURHO3D_TOOLS=0" or abort 'Failed to configure native build for tolua++ target'
     xcode_build(0, 'Build/Urho3D.xcodeproj', 'tolua++') or abort 'Failed to build tolua++ tool'
   else
     jit = 'JIT'
@@ -397,11 +460,11 @@ def xcode_ci
     platform_prefix = ''
     deployment_target = "-DCMAKE_OSX_DEPLOYMENT_TARGET=#{ENV['DEPLOYMENT_TARGET']}"
   end
-  system "./cmake_macosx.sh -DIOS=$IOS #{deployment_target} -DURHO3D_LIB_TYPE=$URHO3D_LIB_TYPE #{$urho3d_64bit} -DURHO3D_LUA#{jit}=1 #{amalg} -DURHO3D_SAMPLES=1 -DURHO3D_TOOLS=1 -DURHO3D_EXTRAS=1 -DURHO3D_TESTING=#{$testing}" or abort 'Failed to configure Urho3D library build'
+  system "./cmake_macosx.sh -DIOS=$IOS #{deployment_target} -DURHO3D_LIB_TYPE=$URHO3D_LIB_TYPE #{$build_options} -DURHO3D_LUA#{jit}=1 #{amalg} -DURHO3D_SAMPLES=1 -DURHO3D_TOOLS=1 -DURHO3D_EXTRAS=1 -DURHO3D_TESTING=#{$testing}" or abort 'Failed to configure Urho3D library build'
   xcode_build(ENV['IOS'], "#{platform_prefix}Build/Urho3D.xcodeproj") or abort 'Failed to build or test Urho3D library'
   # Create a new project on the fly that uses newly built Urho3D library
   scaffolding "#{platform_prefix}Build/generated/externallib"
-  system "URHO3D_HOME=`pwd`; export URHO3D_HOME && cd #{platform_prefix}Build/generated/externallib && echo '\nUsing Urho3D as external library in external project' && ./cmake_macosx.sh -DIOS=$IOS #{deployment_target} #{$urho3d_64bit} -DURHO3D_LUA#{jit}=1 -DURHO3D_TESTING=#{$testing}" or abort 'Failed to configure temporary project using Urho3D as external library'
+  system "URHO3D_HOME=`pwd`; export URHO3D_HOME && cd #{platform_prefix}Build/generated/externallib && echo '\nUsing Urho3D as external library in external project' && ./cmake_macosx.sh -DIOS=$IOS #{deployment_target} #{$build_options} -DURHO3D_LUA#{jit}=1 -DURHO3D_TESTING=#{$testing}" or abort 'Failed to configure temporary project using Urho3D as external library'
   xcode_build(ENV['IOS'], "#{platform_prefix}Build/generated/externallib/#{platform_prefix}Build/Scaffolding.xcodeproj") or abort 'Failed to configure/build/test temporary project using Urho3D as external library'
 end
 
@@ -490,5 +553,8 @@ RLq28S11hDrKf/ZetXNuIprfTlhl6ISBy+oWQibhXmFZSxEiXNV6hCQ=
 EOF" or abort 'Failed to create user private key to id_rsa'
   system 'chmod 600 ~/.ssh/id_rsa' or abort 'Failed to change id_rsa file permission'
 end
+
+# Load custom rake scripts
+Dir['.rake/*.rake'].each { |r| load r }
 
 # vi: set ts=2 sw=2 expandtab:

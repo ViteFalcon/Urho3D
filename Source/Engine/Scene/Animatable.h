@@ -98,7 +98,7 @@ public:
     float GetAttributeAnimationSpeed(const String& name) const;
 
     /// Set object animation attribute.
-    void SetObjectAnimationAttr(ResourceRef value);
+    void SetObjectAnimationAttr(const ResourceRef& value);
     /// Return object animation attribute.
     ResourceRef GetObjectAnimationAttr() const;
 
@@ -119,6 +119,10 @@ protected:
     bool IsAnimatedNetworkAttribute(const AttributeInfo& attrInfo) const;
     /// Return attribute animation info.
     AttributeAnimationInfo* GetAttributeAnimationInfo(const String& name) const;
+    /// Handle attribute animation added.
+    void HandleAttributeAnimationAdded(StringHash eventType, VariantMap& eventData);
+    /// Handle attribute animation removed.
+    void HandleAttributeAnimationRemoved(StringHash eventType, VariantMap& eventData);
 
     /// Animation enabled.
     bool animationEnabled_;

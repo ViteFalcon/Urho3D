@@ -108,7 +108,7 @@ public:
             Drawable* drawable = *start++;
             unsigned char flags = drawable->GetDrawableFlags();
             
-            if ((flags == DRAWABLE_ZONE || ((flags == DRAWABLE_GEOMETRY || flags == DRAWABLE_PROXYGEOMETRY) &&
+            if ((flags == DRAWABLE_ZONE || (flags == DRAWABLE_GEOMETRY &&
                 drawable->IsOccluder())) && (drawable->GetViewMask() & viewMask_))
             {
                 if (inside || frustum_.IsInsideFast(drawable->GetWorldBoundingBox()))
@@ -198,7 +198,7 @@ void CheckVisibilityWork(const WorkItem* item, unsigned threadIndex)
             drawable->MarkInView(view->frame_);
             
             // For geometries, find zone, clear lights and calculate view space Z range
-            if (drawable->GetDrawableFlags() & (DRAWABLE_GEOMETRY | DRAWABLE_PROXYGEOMETRY))
+            if (drawable->GetDrawableFlags() & DRAWABLE_GEOMETRY)
             {
                 Zone* drawableZone = drawable->GetZone();
                 if (!cameraZoneOverride && (drawable->IsZoneDirty() || !drawableZone || (drawableZone->GetViewMask() &
@@ -253,7 +253,9 @@ void UpdateDrawableGeometriesWork(const WorkItem* item, unsigned threadIndex)
     while (start != end)
     {
         Drawable* drawable = *start++;
-        drawable->UpdateGeometry(frame);
+        // We may leave null pointer holes in the queue if a drawable is found out to require a main thread update
+        if (drawable)
+            drawable->UpdateGeometry(frame);
     }
 }
 
@@ -487,7 +489,6 @@ void View::Update(const FrameInfo& frame)
     // Clear buffers, geometry, light, occluder & batch list
     renderTargets_.Clear();
     geometries_.Clear();
-    shadowGeometries_.Clear();
     lights_.Clear();
     zones_.Clear();
     occluders_.Clear();
@@ -783,12 +784,12 @@ void View::GetDrawables()
     if (occlusionBuffer_)
     {
         OccludedFrustumOctreeQuery query(tempDrawables, camera_->GetFrustum(), occlusionBuffer_, DRAWABLE_GEOMETRY |
-            DRAWABLE_PROXYGEOMETRY | DRAWABLE_LIGHT, camera_->GetViewMask());
+            DRAWABLE_LIGHT, camera_->GetViewMask());
         octree_->GetDrawables(query);
     }
     else
     {
-        FrustumOctreeQuery query(tempDrawables, camera_->GetFrustum(), DRAWABLE_GEOMETRY | DRAWABLE_PROXYGEOMETRY |
+        FrustumOctreeQuery query(tempDrawables, camera_->GetFrustum(), DRAWABLE_GEOMETRY | 
             DRAWABLE_LIGHT, camera_->GetViewMask());
         octree_->GetDrawables(query);
     }
@@ -876,6 +877,9 @@ void View::GetBatches()
 {
     if (!octree_ || !camera_)
         return;
+    
+    nonThreadedGeometries_.Clear();
+    threadedGeometries_.Clear();
     
     WorkQueue* queue = GetSubsystem<WorkQueue>();
     PODVector<Light*> vertexLights;
@@ -975,10 +979,15 @@ void View::GetBatches()
                         k < query.shadowCasters_.Begin() + query.shadowCasterEnd_[j]; ++k)
                     {
                         Drawable* drawable = *k;
+                        // If drawable is not in actual view frustum, mark it in view here and check its geometry update type
                         if (!drawable->IsInView(frame_, true))
                         {
                             drawable->MarkInView(frame_.frameNumber_, 0);
-                            shadowGeometries_.Push(drawable);
+                            UpdateGeometryType type = drawable->GetUpdateGeometryType();
+                            if (type == UPDATE_MAIN_THREAD)
+                                nonThreadedGeometries_.Push(drawable);
+                            else if (type == UPDATE_WORKER_THREAD)
+                                threadedGeometries_.Push(drawable);
                         }
                         
                         Zone* zone = GetZone(drawable);
@@ -1075,13 +1084,19 @@ void View::GetBatches()
         }
     }
     
-    // Build base pass batches
+    // Build base pass batches and find out the geometry update queue (threaded or nonthreaded) drawables should end up to
     {
         PROFILE(GetBaseBatches);
         
         for (PODVector<Drawable*>::ConstIterator i = geometries_.Begin(); i != geometries_.End(); ++i)
         {
             Drawable* drawable = *i;
+            UpdateGeometryType type = drawable->GetUpdateGeometryType();
+            if (type == UPDATE_MAIN_THREAD)
+                nonThreadedGeometries_.Push(drawable);
+            else if (type == UPDATE_WORKER_THREAD)
+                threadedGeometries_.Push(drawable);
+            
             Zone* zone = GetZone(drawable);
             const Vector<SourceBatch>& batches = drawable->GetBatches();
             
@@ -1175,7 +1190,6 @@ void View::UpdateGeometries()
     
     // Sort batches
     {
-     
         for (unsigned i = 0; i < renderPath_->commands_.Size(); ++i)
         {
             const RenderPathCommand& command = renderPath_->commands_[i];
@@ -1213,28 +1227,20 @@ void View::UpdateGeometries()
     
     // Update geometries. Split into threaded and non-threaded updates.
     {
-        nonThreadedGeometries_.Clear();
-        threadedGeometries_.Clear();
-        
-        for (PODVector<Drawable*>::Iterator i = geometries_.Begin(); i != geometries_.End(); ++i)
-        {
-            UpdateGeometryType type = (*i)->GetUpdateGeometryType();
-            if (type == UPDATE_MAIN_THREAD)
-                nonThreadedGeometries_.Push(*i);
-            else if (type == UPDATE_WORKER_THREAD)
-                threadedGeometries_.Push(*i);
-        }
-        for (PODVector<Drawable*>::Iterator i = shadowGeometries_.Begin(); i != shadowGeometries_.End(); ++i)
-        {
-            UpdateGeometryType type = (*i)->GetUpdateGeometryType();
-            if (type == UPDATE_MAIN_THREAD)
-                nonThreadedGeometries_.Push(*i);
-            else if (type == UPDATE_WORKER_THREAD)
-                threadedGeometries_.Push(*i);
-        }
-        
         if (threadedGeometries_.Size())
         {
+            // In special cases (context loss, multi-view) a drawable may theoretically first have reported a threaded update, but will actually
+            // require a main thread update. Check these cases first and move as applicable. The threaded work routine will tolerate the null
+            // pointer holes that we leave to the threaded update queue.
+            for (PODVector<Drawable*>::Iterator i = threadedGeometries_.Begin(); i != threadedGeometries_.End(); ++i)
+            {
+                if ((*i)->GetUpdateGeometryType() == UPDATE_MAIN_THREAD)
+                {
+                    nonThreadedGeometries_.Push(*i);
+                    *i = 0;
+                }
+            }
+            
             int numWorkItems = queue->GetNumThreads() + 1; // Worker threads + main thread
             int drawablesPerItem = threadedGeometries_.Size() / numWorkItems;
             
@@ -1464,6 +1470,7 @@ void View::ExecuteRenderPathCommands()
                     
                     SetRenderTargets(command);
                     SetTextures(command);
+                    graphics_->SetDrawAntialiased(true);
                     graphics_->SetFillMode(camera_->GetFillMode());
                     graphics_->SetClipPlane(camera_->GetUseClipping(), camera_->GetClipPlane(), camera_->GetView(), camera_->GetProjection());
                     batchQueues_[command.pass_].Draw(this, command.markToStencil_, false);
@@ -1498,6 +1505,7 @@ void View::ExecuteRenderPathCommands()
                         }
 
                         SetTextures(command);
+                        graphics_->SetDrawAntialiased(true);
                         graphics_->SetFillMode(camera_->GetFillMode());
                         graphics_->SetClipPlane(camera_->GetUseClipping(), camera_->GetClipPlane(), camera_->GetView(), camera_->GetProjection());
                         
@@ -1703,6 +1711,7 @@ void View::RenderQuad(RenderPathCommand& command)
     graphics_->SetBlendMode(BLEND_REPLACE);
     graphics_->SetDepthTest(CMP_ALWAYS);
     graphics_->SetDepthWrite(false);
+    graphics_->SetDrawAntialiased(false);
     graphics_->SetFillMode(FILL_SOLID);
     graphics_->SetClipPlane(false);
     graphics_->SetScissorTest(false);
@@ -2077,7 +2086,7 @@ void View::ProcessLight(LightQueryResult& query, unsigned threadIndex)
         
     case LIGHT_SPOT:
         {
-            FrustumOctreeQuery octreeQuery(tempDrawables, light->GetFrustum(), DRAWABLE_GEOMETRY | DRAWABLE_PROXYGEOMETRY,
+            FrustumOctreeQuery octreeQuery(tempDrawables, light->GetFrustum(), DRAWABLE_GEOMETRY,
                 camera_->GetViewMask());
             octree_->GetDrawables(octreeQuery);
             for (unsigned i = 0; i < tempDrawables.Size(); ++i)
@@ -2091,7 +2100,7 @@ void View::ProcessLight(LightQueryResult& query, unsigned threadIndex)
     case LIGHT_POINT:
         {
             SphereOctreeQuery octreeQuery(tempDrawables, Sphere(light->GetNode()->GetWorldPosition(), light->GetRange()),
-                DRAWABLE_GEOMETRY | DRAWABLE_PROXYGEOMETRY, camera_->GetViewMask());
+                DRAWABLE_GEOMETRY, camera_->GetViewMask());
             octree_->GetDrawables(octreeQuery);
             for (unsigned i = 0; i < tempDrawables.Size(); ++i)
             {
@@ -2133,7 +2142,7 @@ void View::ProcessLight(LightQueryResult& query, unsigned threadIndex)
                 continue;
         
             // Reuse lit geometry query for all except directional lights
-            ShadowCasterOctreeQuery query(tempDrawables, shadowCameraFrustum, DRAWABLE_GEOMETRY | DRAWABLE_PROXYGEOMETRY,
+            ShadowCasterOctreeQuery query(tempDrawables, shadowCameraFrustum, DRAWABLE_GEOMETRY,
                 camera_->GetViewMask());
             octree_->GetDrawables(query);
         }
@@ -2614,7 +2623,7 @@ Technique* View::GetTechnique(Drawable* drawable, Material* material)
             const TechniqueEntry& entry = techniques[i];
             Technique* tech = entry.technique_;
 
-            if (!tech || (tech->IsSM3() && !graphics_->GetSM3Support()) || materialQuality_ < entry.qualityLevel_)
+            if (!tech || (!tech->IsSupported()) || materialQuality_ < entry.qualityLevel_)
                 continue;
             if (lodDistance >= entry.lodDistance_)
                 return tech;
@@ -2628,8 +2637,9 @@ Technique* View::GetTechnique(Drawable* drawable, Material* material)
 void View::CheckMaterialForAuxView(Material* material)
 {
     const SharedPtr<Texture>* textures = material->GetTextures();
-    
-    for (unsigned i = 0; i < MAX_MATERIAL_TEXTURE_UNITS; ++i)
+    unsigned numTextures = material->GetNumUsedTextureUnits();
+
+    for (unsigned i = 0; i < numTextures; ++i)
     {
         Texture* texture = textures[i];
         if (texture && texture->GetUsage() == TEXTURE_RENDERTARGET)
@@ -2698,7 +2708,21 @@ void View::AddBatchToQueue(BatchQueue& batchQueue, Batch& batch, Technique* tech
     {
         renderer_->SetBatchShaders(batch, tech, allowShadows);
         batch.CalculateSortKey();
-        batchQueue.batches_.Push(batch);
+        
+        // If batch is static with multiple world transforms and cannot instance, we must push copies of the batch individually
+        if (batch.geometryType_ == GEOM_STATIC && batch.numWorldTransforms_ > 1)
+        {
+            unsigned numTransforms = batch.numWorldTransforms_;
+            batch.numWorldTransforms_ = 1;
+            for (unsigned i = 0; i < numTransforms; ++i)
+            {
+                // Move the transform pointer to generate copies of the batch which only refer to 1 world transform
+                batchQueue.batches_.Push(batch);
+                ++batch.worldTransform_;
+            }
+        }
+        else
+            batchQueue.batches_.Push(batch);
     }
 }
 
@@ -2796,6 +2820,7 @@ void View::RenderShadowMap(const LightBatchQueue& queue)
     graphics_->SetTexture(TU_SHADOWMAP, 0);
     
     graphics_->SetColorWrite(false);
+    graphics_->SetDrawAntialiased(true);
     graphics_->SetFillMode(FILL_SOLID);
     graphics_->SetClipPlane(false);
     graphics_->SetStencilTest(false);

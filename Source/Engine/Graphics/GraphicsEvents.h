@@ -37,6 +37,13 @@ EVENT(E_SCREENMODE, ScreenMode)
     PARAM(P_BORDERLESS, Borderless);        // bool
 }
 
+/// Window position changed.
+EVENT(E_WINDOWPOS, WindowPos)
+{
+    PARAM(P_X, X);                          // int
+    PARAM(P_Y, Y);                          // int
+}
+
 /// Graphics features checked.
 EVENT(E_GRAPHICSFEATURES, GraphicsFeatures)
 {
@@ -92,5 +99,16 @@ EVENT(E_ENDVIEWRENDER, EndViewRender)
     PARAM(P_SCENE, Scene);                  // Scene pointer
     PARAM(P_CAMERA, Camera);                // Camera pointer
 }
+
+/// Graphics context has been lost. Some or all (depending on the API) GPU objects have lost their contents.
+EVENT(E_DEVICELOST, DeviceLost)
+{
+}
+
+/// Graphics context has been recreated after being lost. GPU objects in the "data lost" state can be restored now.
+EVENT(E_DEVICERESET, DeviceReset)
+{
+}
+
 
 }

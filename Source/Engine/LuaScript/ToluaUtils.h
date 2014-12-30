@@ -27,7 +27,9 @@
 #ifdef URHO3D_PHYSICS
 #include "PhysicsWorld.h"
 #endif
+#ifdef URHO3D_URHO2D
 #include "PhysicsWorld2D.h"
+#endif
 #include "Vector2.h"
 #include "Vector3.h"
 
@@ -36,6 +38,7 @@ struct lua_State;
 namespace Urho3D
 {
 class Context;
+class Pass;
 class SoundSource;
 class UIElement;
 }
@@ -94,6 +97,8 @@ template<> void* ToluaToVector<String>(lua_State* L, int narg, void* def);
 template<typename T> int ToluaPushVector(lua_State*L, void* data, const char* type);
 /// Push Vector<String> to Lua as a table.
 template<> int ToluaPushVector<String>(lua_State* L, void* data, const char* type);
+/// Push Vector<StringHash> to Lua as a table.
+template<> int ToluaPushVector<StringHash>(lua_State* L, void* data, const char* type);
 
 /// Check is PODVector<T>.
 template<typename T> int ToluaIsPODVector(lua_State* L, int lo, const char* type, int def, tolua_Error* err);
@@ -123,8 +128,10 @@ template<> int ToluaPushPODVector<UIElement*>(lua_State* L, void* data, const ch
 /// Push PODVector<RigidBody*> to Lua as a table.
 template<> int ToluaPushPODVector<RigidBody*>(lua_State* L, void* data, const char* type);
 #endif
+#ifdef URHO3D_URHO2D
 /// Push PODVector<RigidBody2D*> to Lua as a table.
 template<> int ToluaPushPODVector<RigidBody2D*>(lua_State* L, void* data, const char* type);
+#endif
 /// Push PODVector<Vector3> to Lua as a table.
 template<> int ToluaPushPODVector<Vector3>(lua_State* L, void* data, const char* type);
 /// Push PODVector<IntVector2> to Lua as a table.
@@ -135,10 +142,14 @@ template<> int ToluaPushPODVector<OctreeQueryResult>(lua_State* L, void* data, c
 /// Push PODVector<PhysicsRaycastResult> to Lua as a table.
 template<> int ToluaPushPODVector<PhysicsRaycastResult>(lua_State* L, void* data, const char* type);
 #endif
+#ifdef URHO3D_URHO2D
 /// Push PODVector<PhysicsRaycastResult2D> to Lua as a table.
 template<> int ToluaPushPODVector<PhysicsRaycastResult2D>(lua_State* L, void* data, const char* type);
+#endif
 /// Push PODVector<RayQueryResult> to Lua as a table.
 template<> int ToluaPushPODVector<RayQueryResult>(lua_State* L, void* data, const char* type);
+/// Push PODVector<Pass*> to Lua as a table.
+template<> int ToluaPushPODVector<Pass*>(lua_State* L, void* data, const char* type);
 /// Push Object to Lua.
 void ToluaPushObject(lua_State*L, void* data, const char* type);
 

@@ -91,6 +91,7 @@ void Urho2DSpriterAnimation::CreateScene()
 
     Graphics* graphics = GetSubsystem<Graphics>();
     camera->SetOrthoSize((float)graphics->GetHeight() * PIXEL_SIZE);
+    camera->SetZoom(1.5f * Min((float)graphics->GetWidth() / 1280.0f, (float)graphics->GetHeight() / 800.0f)); // Set zoom according to user's resolution to ensure full visibility (initial zoom (1.5) is set for full visibility at 1280x800 resolution)
 
     ResourceCache* cache = GetSubsystem<ResourceCache>();  
     AnimationSet2D* animationSet = cache->GetResource<AnimationSet2D>("Urho2D/imp/imp.scml");
@@ -98,7 +99,7 @@ void Urho2DSpriterAnimation::CreateScene()
         return;
 
     spriteNode_ = scene_->CreateChild("SpriterAnimation");
-    spriteNode_->SetPosition(Vector3(-1.4f, 2.0f, 0.0f));
+    spriteNode_->SetPosition(Vector3(0.0f, 2.0f, 0.0f));
 
     AnimatedSprite2D* animatedSprite = spriteNode_->CreateComponent<AnimatedSprite2D>();
     animatedSprite->SetAnimation(animationSet, animationNames[animationIndex_]);
@@ -113,6 +114,7 @@ void Urho2DSpriterAnimation::CreateInstructions()
     Text* instructionText = ui->GetRoot()->CreateChild<Text>();
     instructionText->SetText("Mouse click to play next animation, \nUse WASD keys to move, use PageUp PageDown keys to zoom.");
     instructionText->SetFont(cache->GetResource<Font>("Fonts/Anonymous Pro.ttf"), 15);
+    instructionText->SetTextAlignment(HA_CENTER); // Center rows in relation to each other
 
     // Position the text relative to the screen center
     instructionText->SetHorizontalAlignment(HA_CENTER);

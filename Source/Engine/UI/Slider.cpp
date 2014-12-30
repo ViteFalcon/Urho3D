@@ -39,11 +39,6 @@ const char* orientations[] =
     0
 };
 
-template<> Orientation Variant::Get<Orientation>() const
-{
-    return (Orientation)GetInt();
-}
-
 extern const char* UI_CATEGORY;
 
 Slider::Slider(Context* context) :
@@ -69,12 +64,12 @@ void Slider::RegisterObject(Context* context)
 {
     context->RegisterFactory<Slider>(UI_CATEGORY);
 
-    COPY_BASE_ATTRIBUTES(Slider, BorderImage);
-    UPDATE_ATTRIBUTE_DEFAULT_VALUE(Slider, "Is Enabled", true);
-    ENUM_ACCESSOR_ATTRIBUTE(Slider, "Orientation", GetOrientation, SetOrientation, Orientation, orientations, O_HORIZONTAL, AM_FILE);
-    ACCESSOR_ATTRIBUTE(Slider, VAR_FLOAT, "Range", GetRange, SetRange, float, 1.0f, AM_FILE);
-    ACCESSOR_ATTRIBUTE(Slider, VAR_FLOAT, "Value", GetValue, SetValue, float, 0.0f, AM_FILE);
-    ACCESSOR_ATTRIBUTE(Slider, VAR_FLOAT, "Repeat Rate", GetRepeatRate, SetRepeatRate, float, 0.0f, AM_FILE);
+    COPY_BASE_ATTRIBUTES(BorderImage);
+    UPDATE_ATTRIBUTE_DEFAULT_VALUE("Is Enabled", true);
+    ENUM_ACCESSOR_ATTRIBUTE("Orientation", GetOrientation, SetOrientation, Orientation, orientations, O_HORIZONTAL, AM_FILE);
+    ACCESSOR_ATTRIBUTE("Range", GetRange, SetRange, float, 1.0f, AM_FILE);
+    ACCESSOR_ATTRIBUTE("Value", GetValue, SetValue, float, 0.0f, AM_FILE);
+    ACCESSOR_ATTRIBUTE("Repeat Rate", GetRepeatRate, SetRepeatRate, float, 0.0f, AM_FILE);
 }
 
 void Slider::Update(float timeStep)
@@ -116,12 +111,17 @@ void Slider::OnClickEnd(const IntVector2& position, const IntVector2& screenPosi
 
 void Slider::OnDragBegin(const IntVector2& position, const IntVector2& screenPosition, int buttons, int qualifiers, Cursor* cursor)
 {
-    dragBeginCursor_ = position;
-    dragBeginPosition_ = knob_->GetPosition();
-    dragSlider_ = knob_->IsInside(screenPosition, true);
+    UIElement::OnDragBegin(position, screenPosition, buttons, qualifiers, cursor);
+
+    if (buttons == MOUSEB_LEFT)
+    {
+        dragBeginCursor_ = position;
+        dragBeginPosition_ = knob_->GetPosition();
+        dragSlider_ = knob_->IsInside(screenPosition, true);
+    }
 }
 
-void Slider::OnDragMove(const IntVector2& position, const IntVector2& screenPosition, int buttons, int qualifiers, Cursor* cursor)
+void Slider::OnDragMove(const IntVector2& position, const IntVector2& screenPosition, const IntVector2& deltaPos, int buttons, int qualifiers, Cursor* cursor)
 {
     if (!editable_ || !dragSlider_ || GetSize() == knob_->GetSize())
         return;
@@ -145,10 +145,15 @@ void Slider::OnDragMove(const IntVector2& position, const IntVector2& screenPosi
     SetValue(newValue);
 }
 
-void Slider::OnDragEnd(const IntVector2& position, const IntVector2& screenPosition, Cursor* cursor)
+void Slider::OnDragEnd(const IntVector2& position, const IntVector2& screenPosition, int dragButtons, int buttons, Cursor* cursor)
 {
-    dragSlider_ = false;
-    selected_ = false;
+    UIElement::OnDragEnd(position, screenPosition, dragButtons, buttons, cursor);
+
+    if (dragButtons == MOUSEB_LEFT)
+    {
+        dragSlider_ = false;
+        selected_ = false;
+    }
 }
 
 void Slider::OnResize()

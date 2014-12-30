@@ -67,7 +67,7 @@ struct URHO3D_API PhysicsRaycastResult
 
     /// Test for inequality, added to prevent GCC from complaining.
     bool operator != (const PhysicsRaycastResult& rhs) const { return position_ != rhs.position_ || normal_ != rhs.normal_ || distance_ != rhs.distance_ || body_ != rhs.body_; }
-    
+
     /// Hit worldspace position.
     Vector3 position_;
     /// Hit worldspace normal.
@@ -130,10 +130,12 @@ public:
     void Update(float timeStep);
     /// Refresh collisions only without updating dynamics.
     void UpdateCollisions();
-    /// Set simulation steps per second.
+    /// Set simulation substeps per second.
     void SetFps(int fps);
     /// Set gravity.
-    void SetGravity(Vector3 gravity);
+    void SetGravity(const Vector3& gravity);
+    /// Set maximum number of physics substeps per frame. 0 (default) is unlimited. Positive values cap the amount. Use a negative value to enable an adaptive timestep. This may cause inconsistent physics behavior.
+    void SetMaxSubSteps(int num);
     /// Set number of constraint solver iterations.
     void SetNumIterations(int num);
     /// Set whether to interpolate between simulation steps.
@@ -162,9 +164,11 @@ public:
     void GetRigidBodies(PODVector<RigidBody*>& result, const BoundingBox& box, unsigned collisionMask = M_MAX_UNSIGNED);
     /// Return rigid bodies that have been in collision with a specific body on the last simulation step.
     void GetRigidBodies(PODVector<RigidBody*>& result, const RigidBody* body);
-    
+
     /// Return gravity.
     Vector3 GetGravity() const;
+    /// Return maximum number of physics substeps per frame.
+    int GetMaxSubSteps() const { return maxSubSteps_; }
     /// Return number of constraint solver iterations.
     int GetNumIterations() const;
     /// Return whether interpolation between simulation steps is enabled.
@@ -262,8 +266,10 @@ private:
     VariantMap nodeCollisionData_;
     /// Preallocated buffer for physics collision contact data.
     VectorBuffer contacts_;
-    /// Simulation steps per second.
+    /// Simulation substeps per second.
     unsigned fps_;
+    /// Maximum number of simulation substeps per frame. 0 (default) unlimited, or negative values for adaptive timestep.
+    int maxSubSteps_;
     /// Time accumulator for non-interpolated mode.
     float timeAcc_;
     /// Maximum angular velocity for network replication.

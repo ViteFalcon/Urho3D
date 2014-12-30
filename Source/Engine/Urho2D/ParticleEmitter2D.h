@@ -28,13 +28,14 @@ namespace Urho3D
 {
 
 class ParticleEffect2D;
+class Sprite2D;
 
 /// 2D particle.
  struct Particle2D
 {
     /// Time to live.
     float timeToLive_;
-    
+
     /// Position.
     Vector2 position_;
     /// Size.
@@ -86,22 +87,29 @@ public:
 
     /// Handle enabled/disabled state change.
     virtual void OnSetEnabled();
-    /// Update before octree reinsertion. is called from a worker thread.
-    virtual void Update(const FrameInfo& frame);
-
+    
     /// Set particle effect.
     void SetEffect(ParticleEffect2D* effect);
+    /// Set sprite.
+    void SetSprite(Sprite2D* sprite);
     /// Set max particles.
     void SetMaxParticles(unsigned maxParticles);
+
     /// Return particle effect.
     ParticleEffect2D* GetEffect() const;
+    /// Return sprite.
+    Sprite2D* GetSprite() const;
     /// Return max particles.
     unsigned GetMaxParticles() const { return particles_.Size(); }
 
     /// Set particle model attr.
-    void SetParticleEffectAttr(ResourceRef value);
+    void SetParticleEffectAttr(const ResourceRef& value);
     /// Return particle model attr.
     ResourceRef GetParticleEffectAttr() const;
+    /// Set sprite attribute.
+    void SetSpriteAttr(const ResourceRef& value);
+    /// Return sprite attribute.
+    ResourceRef GetSpriteAttr() const;
 
 private:
     /// Handle node being assigned.
@@ -112,6 +120,8 @@ private:
     virtual void UpdateVertices();
     /// Handle scene post update.
     void HandleScenePostUpdate(StringHash eventType, VariantMap& eventData);
+    /// Update.
+    void Update(float timeStep);
     /// Emit particle.
     bool EmitParticle(const Vector3& worldPosition, float worldAngle, float worldScale);
     /// Update particle.
@@ -119,6 +129,8 @@ private:
 
     /// Particle effect.
     SharedPtr<ParticleEffect2D> effect_;
+    /// Sprite.
+    SharedPtr<Sprite2D> sprite_;
     /// Num particles.
     int numParticles_;
     /// Emission time.

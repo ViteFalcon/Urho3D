@@ -61,7 +61,7 @@ public:
     /// Stop playback.
     void Stop();
     /// Set sound type, determines the master gain group.
-    void SetSoundType(SoundType type);
+    void SetSoundType(const String& type);
     /// Set frequency.
     void SetFrequency(float frequency);
     /// Set gain. 0.0 is silence, 1.0 is full volume.
@@ -80,7 +80,7 @@ public:
     /// Return playback position.
     volatile signed char* GetPlayPosition() const { return position_; }
     /// Return sound type, determines the master gain group.
-    SoundType GetSoundType() const { return soundType_; }
+    String GetSoundType() const { return soundType_; }
     /// Return playback time position.
     float GetTimePosition() const { return timePosition_; }
     /// Return frequency.
@@ -100,9 +100,11 @@ public:
     virtual void Update(float timeStep);
     /// Mix sound source output to a 32-bit clipping buffer. Called by Audio.
     void Mix(int* dest, unsigned samples, int mixRate, bool stereo, bool interpolation);
+    /// Update the effective master gain. Called internally and by Audio when the master gain changes.
+    void UpdateMasterGain();
     
     /// Set sound attribute.
-    void SetSoundAttr(ResourceRef value);
+    void SetSoundAttr(const ResourceRef& value);
     /// Set sound position attribute.
     void SetPositionAttr(int value);
     /// Return sound attribute.
@@ -116,7 +118,9 @@ protected:
     /// Audio subsystem.
     WeakPtr<Audio> audio_;
     /// SoundSource type, determines the master gain group.
-    SoundType soundType_;
+    String soundType_;
+    /// SoundSource type hash.
+    StringHash soundTypeHash_;
     /// Frequency.
     float frequency_;
     /// Gain.
@@ -127,6 +131,8 @@ protected:
     float panning_;
     /// Autoremove timer.
     float autoRemoveTimer_;
+    /// Effective master gain.
+    float masterGain_;
     /// Autoremove flag.
     bool autoRemove_;
     

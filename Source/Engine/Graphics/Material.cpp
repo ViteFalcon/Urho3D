@@ -22,6 +22,7 @@
 
 #include "Precompiled.h"
 #include "Context.h"
+#include "CoreEvents.h"
 #include "FileSystem.h"
 #include "Graphics.h"
 #include "Log.h"
@@ -29,6 +30,9 @@
 #include "Matrix3x4.h"
 #include "Profiler.h"
 #include "ResourceCache.h"
+#include "Scene.h"
+#include "SceneEvents.h"
+#include "StringUtils.h"
 #include "Technique.h"
 #include "Texture2D.h"
 #include "TextureCube.h"
@@ -89,7 +93,7 @@ TextureUnit ParseTextureUnitName(String name)
             unit = TU_ENVIRONMENT;
         // Finally check for specifying the texture unit directly as a number
         else if (name.Length() < 3)
-            unit = (TextureUnit)Clamp(ToInt(name), 0, MAX_TEXTURE_UNITS);
+            unit = (TextureUnit)Clamp(ToInt(name), 0, MAX_TEXTURE_UNITS - 1);
     }
 
     if (unit == MAX_TEXTURE_UNITS)
@@ -149,9 +153,10 @@ void ShaderParameterAnimationInfo::ApplyValue(const Variant& newValue)
 Material::Material(Context* context) :
     Resource(context),
     auxViewFrameNumber_(0),
+    numUsedTextureUnits_(0),
     occlusion_(true),
     specular_(false),
-    animationFrameNumber_(0)
+    subscribed_(false)
 {
     ResetToDefaults();
 }
@@ -281,7 +286,7 @@ bool Material::Load(const XMLElement& source)
         TextureUnit unit = TU_DIFFUSE;
         if (textureElem.HasAttribute("unit"))
             unit = ParseTextureUnitName(textureElem.GetAttribute("unit"));
-        if (unit < MAX_MATERIAL_TEXTURE_UNITS)
+        if (unit < MAX_TEXTURE_UNITS)
         {
             String name = textureElem.GetAttribute("name");
             // Detect cube maps by file extension: they are defined by an XML file
@@ -342,7 +347,6 @@ bool Material::Load(const XMLElement& source)
     if (depthBiasElem)
         SetDepthBias(BiasParameters(depthBiasElem.GetFloat("constant"), depthBiasElem.GetFloat("slopescaled")));
 
-    // Calculate memory use
     RefreshMemoryUse();
     CheckOcclusion();
     return true;
@@ -370,13 +374,13 @@ bool Material::Save(XMLElement& dest) const
     }
 
     // Write texture units
-    for (unsigned j = 0; j < MAX_MATERIAL_TEXTURE_UNITS; ++j)
+    for (unsigned j = 0; j < MAX_TEXTURE_UNITS; ++j)
     {
         Texture* texture = GetTexture((TextureUnit)j);
         if (texture)
         {
             XMLElement textureElem = dest.CreateChild("texture");
-            textureElem.SetString("unit", textureUnitNames[j]);
+            textureElem.SetString("unit", j < MAX_NAMED_TEXTURE_UNITS ? textureUnitNames[j] : String(j).CString());
             textureElem.SetString("name", texture->GetName());
         }
     }
@@ -482,6 +486,7 @@ void Material::SetShaderParameterAnimation(const String& name, ValueAnimation* a
         
         StringHash nameHash(name);
         shaderParameterAnimationInfos_[nameHash] = new ShaderParameterAnimationInfo(this, name, animation, wrapMode, speed);
+        UpdateEventSubscription();
     }
     else
     {
@@ -489,6 +494,7 @@ void Material::SetShaderParameterAnimation(const String& name, ValueAnimation* a
         {
             StringHash nameHash(name);
             shaderParameterAnimationInfos_.Erase(nameHash);
+            UpdateEventSubscription();
         }
     }
 }
@@ -509,8 +515,19 @@ void Material::SetShaderParameterAnimationSpeed(const String& name, float speed)
 
 void Material::SetTexture(TextureUnit unit, Texture* texture)
 {
-    if (unit < MAX_MATERIAL_TEXTURE_UNITS)
+    if (unit < MAX_TEXTURE_UNITS)
+    {
         textures_[unit] = texture;
+
+        // Update the number of used texture units
+        if (texture && (unsigned)unit >= numUsedTextureUnits_)
+            numUsedTextureUnits_ = unit + 1;
+        else if (!texture && unit == numUsedTextureUnits_ - 1)
+        {
+            while (numUsedTextureUnits_ && !textures_[numUsedTextureUnits_ - 1])
+                --numUsedTextureUnits_;
+        }
+    }
 }
 
 void Material::SetUVTransform(const Vector2& offset, float rotation, const Vector2& repeat)
@@ -562,6 +579,15 @@ void Material::SetDepthBias(const BiasParameters& parameters)
     depthBias_.Validate();
 }
 
+void Material::SetScene(Scene* scene)
+{
+    UnsubscribeFromEvent(E_UPDATE);
+    UnsubscribeFromEvent(E_ATTRIBUTEANIMATIONUPDATE);
+    subscribed_ = false;
+    scene_ = scene;
+    UpdateEventSubscription();
+}
+
 void Material::RemoveShaderParameter(const String& name)
 {
     StringHash nameHash(name);
@@ -590,12 +616,13 @@ SharedPtr<Material> Material::Clone(const String& cloneName) const
     ret->SetName(cloneName);
     ret->techniques_ = techniques_;
     ret->shaderParameters_ = shaderParameters_;
-    for (unsigned i = 0; i < MAX_MATERIAL_TEXTURE_UNITS; ++i)
+    for (unsigned i = 0; i < MAX_TEXTURE_UNITS; ++i)
         ret->textures_[i] = textures_[i];
     ret->occlusion_ = occlusion_;
     ret->specular_ = specular_;
     ret->cullMode_ = cullMode_;
     ret->shadowCullMode_ = shadowCullMode_;
+    ret->numUsedTextureUnits_ = numUsedTextureUnits_;
     ret->RefreshMemoryUse();
 
     return ret;
@@ -609,30 +636,6 @@ void Material::SortTechniques()
 void Material::MarkForAuxView(unsigned frameNumber)
 {
     auxViewFrameNumber_ = frameNumber;
-}
-
-void Material::UpdateShaderParameterAnimations()
-{
-    if (shaderParameterAnimationInfos_.Empty())
-        return;
-
-    Time* time = GetSubsystem<Time>();
-    if (time->GetFrameNumber() == animationFrameNumber_)
-        return;
-
-    animationFrameNumber_ = time->GetFrameNumber();
-    float timeStep = time->GetTimeStep();
-
-    Vector<String> finishedNames;
-    for (HashMap<StringHash, SharedPtr<ShaderParameterAnimationInfo> >::ConstIterator i = shaderParameterAnimationInfos_.Begin(); i != shaderParameterAnimationInfos_.End(); ++i)
-    {
-        if (i->second_->Update(timeStep))
-            finishedNames.Push(i->second_->GetName());
-    }
-
-    // Remove finished animation
-    for (unsigned i = 0; i < finishedNames.Size(); ++i)
-        SetShaderParameterAnimation(finishedNames[i], 0);
 }
 
 const TechniqueEntry& Material::GetTechniqueEntry(unsigned index) const
@@ -653,7 +656,7 @@ Pass* Material::GetPass(unsigned index, StringHash passType) const
 
 Texture* Material::GetTexture(TextureUnit unit) const
 {
-    return unit < MAX_MATERIAL_TEXTURE_UNITS ? textures_[unit] : (Texture*)0;
+    return unit < MAX_TEXTURE_UNITS ? textures_[unit] : (Texture*)0;
 }
 
 const Variant& Material::GetShaderParameter(const String& name) const
@@ -678,6 +681,11 @@ float Material::GetShaderParameterAnimationSpeed(const String& name) const
 {
     ShaderParameterAnimationInfo* info = GetShaderParameterAnimationInfo(name);
     return info == 0 ? 0 : info->GetSpeed();
+}
+
+Scene* Material::GetScene() const
+{
+    return scene_;
 }
 
 String Material::GetTextureUnitName(TextureUnit unit)
@@ -719,7 +727,7 @@ void Material::ResetToDefaults()
     SetNumTechniques(1);
     SetTechnique(0, GetSubsystem<ResourceCache>()->GetResource<Technique>("Techniques/NoTexture.xml"));
 
-    for (unsigned i = 0; i < MAX_MATERIAL_TEXTURE_UNITS; ++i)
+    for (unsigned i = 0; i < MAX_TEXTURE_UNITS; ++i)
         textures_[i] = 0;
 
     shaderParameters_.Clear();
@@ -743,7 +751,7 @@ void Material::RefreshMemoryUse()
     unsigned memoryUse = sizeof(Material);
 
     memoryUse += techniques_.Size() * sizeof(TechniqueEntry);
-    memoryUse += MAX_MATERIAL_TEXTURE_UNITS * sizeof(SharedPtr<Texture>);
+    memoryUse += MAX_TEXTURE_UNITS * sizeof(SharedPtr<Texture>);
     memoryUse += shaderParameters_.Size() * sizeof(MaterialShaderParameter);
 
     SetMemoryUse(memoryUse);
@@ -756,6 +764,41 @@ ShaderParameterAnimationInfo* Material::GetShaderParameterAnimationInfo(const St
     if (i == shaderParameterAnimationInfos_.End())
         return 0;
     return i->second_;
+}
+
+void Material::UpdateEventSubscription()
+{
+    if (shaderParameterAnimationInfos_.Size() && !subscribed_)
+    {
+        if (scene_)
+            SubscribeToEvent(scene_, E_ATTRIBUTEANIMATIONUPDATE, HANDLER(Material, HandleAttributeAnimationUpdate));
+        else
+            SubscribeToEvent(E_UPDATE, HANDLER(Material, HandleAttributeAnimationUpdate));
+        subscribed_ = true;
+    }
+    else if (subscribed_)
+    {
+        UnsubscribeFromEvent(E_UPDATE);
+        UnsubscribeFromEvent(E_ATTRIBUTEANIMATIONUPDATE);
+        subscribed_ = false;
+    }
+}
+
+void Material::HandleAttributeAnimationUpdate(StringHash eventType, VariantMap& eventData)
+{
+    // Timestep parameter is same no matter what event is being listened to
+    float timeStep = eventData[Update::P_TIMESTEP].GetFloat();
+
+    Vector<String> finishedNames;
+    for (HashMap<StringHash, SharedPtr<ShaderParameterAnimationInfo> >::ConstIterator i = shaderParameterAnimationInfos_.Begin(); i != shaderParameterAnimationInfos_.End(); ++i)
+    {
+        if (i->second_->Update(timeStep))
+            finishedNames.Push(i->second_->GetName());
+    }
+
+    // Remove finished animations
+    for (unsigned i = 0; i < finishedNames.Size(); ++i)
+        SetShaderParameterAnimation(finishedNames[i], 0);
 }
 
 }

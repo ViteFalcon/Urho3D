@@ -80,6 +80,9 @@ bool ResetScene()
     }
     else
         messageBoxCallback = null;
+        
+    // Clear stored script attributes
+    scriptAttributes.Clear();
 
     suppressSceneChanges = true;
 
@@ -180,6 +183,9 @@ bool LoadScene(const String&in fileName)
         MessageBox("Could not open file.\n" + fileName);
         return false;
     }
+    
+    // Reset stored script attributes.
+    scriptAttributes.Clear();
 
     // Add the scene's resource path in case it's necessary
     String newScenePath = GetPath(fileName);
@@ -221,6 +227,9 @@ bool LoadScene(const String&in fileName)
     CreateGrid();
     SetActiveViewport(viewports[0]);
 
+    // Store all ScriptInstance and LuaScriptInstance attributes
+    UpdateScriptInstances();
+
     return loaded;
 }
 
@@ -234,9 +243,11 @@ bool SaveScene(const String&in fileName)
     // Unpause when saving so that the scene will work properly when loaded outside the editor
     editorScene.updateEnabled = true;
 
+    MakeBackup(fileName);
     File file(fileName, FILE_WRITE);
     String extension = GetExtension(fileName);
     bool success = (extension != ".xml" ? editorScene.Save(file) : editorScene.SaveXML(file));
+    RemoveBackup(success, fileName);
 
     editorScene.updateEnabled = false;
 
@@ -418,6 +429,7 @@ bool SaveNode(const String&in fileName)
 
     ui.cursor.shape = CS_BUSY;
 
+    MakeBackup(fileName);
     File file(fileName, FILE_WRITE);
     if (!file.open)
     {
@@ -427,6 +439,8 @@ bool SaveNode(const String&in fileName)
 
     String extension = GetExtension(fileName);
     bool success = (extension != ".xml" ? editNode.Save(file) : editNode.SaveXML(file));
+    RemoveBackup(success, fileName);
+
     if (success)
         instantiateFileName = fileName;
     else
@@ -453,6 +467,7 @@ void StopSceneUpdate()
         suppressSceneChanges = true;
         editorScene.Clear();
         editorScene.LoadXML(revertData.GetRoot());
+        CreateGrid();
         UpdateHierarchyItem(editorScene, true);
         ClearEditActions();
         suppressSceneChanges = false;
@@ -612,7 +627,7 @@ bool SceneCopy()
     return true;
 }
 
-bool ScenePaste()
+bool ScenePaste(bool pasteRoot = false, bool duplication = false)
 {
     ui.cursor.shape = CS_BUSY;
 
@@ -645,9 +660,28 @@ bool ScenePaste()
         }
         else if (mode == "node")
         {
-            // Make the paste go always to the root node, no matter of the selected node
             // If copied node was local, make the new local too
-            Node@ newNode = editorScene.CreateChild("", rootElem.GetBool("local") ? LOCAL : REPLICATED);
+            Node@ newNode;
+            // Are we pasting into the root node?
+            if (pasteRoot)
+                newNode = editorScene.CreateChild("", rootElem.GetBool("local") ? LOCAL : REPLICATED);
+            else
+            {
+                // If we are duplicating, paste into the selected nodes parent
+                if (duplication)
+                {
+                    if (editNode.parent !is null)
+                        newNode = editNode.parent.CreateChild("", rootElem.GetBool("local") ? LOCAL : REPLICATED);
+                    else
+                        newNode = editorScene.CreateChild("", rootElem.GetBool("local") ? LOCAL : REPLICATED);
+                }
+                // If we aren't duplicating, paste into the selected node
+                else
+                {
+                    newNode = editNode.CreateChild("", rootElem.GetBool("local") ? LOCAL : REPLICATED);
+                }
+            }
+
             newNode.LoadXML(rootElem);
 
             // Create an undo action
@@ -659,6 +693,25 @@ bool ScenePaste()
 
     SaveEditActionGroup(group);
     SetSceneModified();
+    return true;
+}
+
+bool SceneDuplicate()
+{
+    Array<XMLFile@> copy = sceneCopyBuffer;
+
+    if (!SceneCopy())
+    {
+        sceneCopyBuffer = copy;
+        return false;
+    }
+    if (!ScenePaste(false, true))
+    {
+        sceneCopyBuffer = copy;
+        return false;
+    }
+
+    sceneCopyBuffer = copy;
     return true;
 }
 
@@ -962,7 +1015,7 @@ void AssignMaterial(StaticModel@ model, String materialPath)
     action.Define(model, oldMaterials, material);
     SaveEditAction(action);
     SetSceneModified();
-    FocusComponent(model); 
+    FocusComponent(model);
 }
 
 void UpdateSceneMru(String filename)

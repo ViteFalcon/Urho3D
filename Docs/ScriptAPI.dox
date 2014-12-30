@@ -54,6 +54,10 @@ namespace Urho3D
 - %Resizable : bool
 - %Borderless : bool
 
+### WindowPos
+- %X : int
+- %Y : int
+
 ### GraphicsFeatures
 
 ### RenderSurfaceUpdate
@@ -85,6 +89,10 @@ namespace Urho3D
 - %Surface : RenderSurface pointer
 - %Scene : Scene pointer
 - %Camera : Camera pointer
+
+### DeviceLost
+
+### DeviceReset
 
 ## %IO events
 
@@ -353,6 +361,14 @@ namespace Urho3D
 - %Scene : Scene pointer
 - %TimeStep : float
 
+### AttributeAnimationAdded
+- %ObjectAnimation : Object animation pointer
+- %AttributeAnimationName : String
+
+### AttributeAnimationRemoved
+- %ObjectAnimation : Object animation pointer
+- %AttributeAnimationName : String
+
 ### ScenePostUpdate
 - %Scene : Scene pointer
 - %TimeStep : float
@@ -517,6 +533,7 @@ namespace Urho3D
 ### TextFinished
 - %Element : UIElement pointer
 - %Text : String
+- %Value : Float
 
 ### MenuSelected
 - %Element : UIElement pointer
@@ -588,13 +605,19 @@ namespace Urho3D
 - %Y : int
 - %ElementX : int
 - %ElementY : int
+- %Buttons : int
+- %NumButtons : int
 
 ### DragMove
 - %Element : UIElement pointer
 - %X : int
 - %Y : int
+- %DX : int
+- %DY : int
 - %ElementX : int
 - %ElementY : int
+- %Buttons : int
+- %NumButtons : int
 
 ### DragEnd
 - %Element : UIElement pointer
@@ -602,6 +625,8 @@ namespace Urho3D
 - %Y : int
 - %ElementX : int
 - %ElementY : int
+- %Buttons : int
+- %NumButtons : int
 
 ### DragCancel
 - %Element : UIElement pointer
@@ -609,6 +634,8 @@ namespace Urho3D
 - %Y : int
 - %ElementX : int
 - %ElementY : int
+- %Buttons : int
+- %NumButtons : int
 
 ### UIDropFile
 - %FileName : String
@@ -641,21 +668,21 @@ namespace Urho3D
 - %Animation %States : VariantVector
 
 ### AnimatedSprite2D
-- %Layer : int
-- %Order %in %Layer : int
-- %Blend %Mode : int
 - %Flip X : bool
 - %Flip Y : bool
 - %Color : Color
-- %Speed : float
-- %Animation %Set : ResourceRef
-- %Animation : String
-- %Loop %Mode : int
+- %Layer : int
+- %Order %in %Layer : int
+- %Blend %Mode : int
 - %Max %Lights : int
 - %View %Mask : int
 - %Light %Mask : int
 - %Shadow %Mask : int
 - %Zone %Mask : int
+- %Speed : float
+- %Animation %Set : ResourceRef
+- %Animation : String
+- %Loop %Mode : int
 
 ### AnimationController
 - %Is %Enabled : bool
@@ -708,6 +735,7 @@ namespace Urho3D
 - %Layout %Mode : int
 - %Layout %Spacing : int
 - %Layout %Border : IntRect
+- %Layout %Flex %Scale : Vector2
 - %Indent : int
 - %Indent %Spacing : int
 - %Variables : VariantMap
@@ -748,6 +776,7 @@ namespace Urho3D
 - %Layout %Mode : int
 - %Layout %Spacing : int
 - %Layout %Border : IntRect
+- %Layout %Flex %Scale : Vector2
 - %Indent : int
 - %Indent %Spacing : int
 - %Variables : VariantMap
@@ -812,6 +841,7 @@ namespace Urho3D
 - %Layout %Mode : int
 - %Layout %Spacing : int
 - %Layout %Border : IntRect
+- %Layout %Flex %Scale : Vector2
 - %Indent : int
 - %Indent %Spacing : int
 - %Variables : VariantMap
@@ -846,6 +876,7 @@ namespace Urho3D
 - %Density : float
 - %Friction : float
 - %Restitution : float
+- %Vertices : Buffer
 
 ### CollisionCircle2D
 - %Radius : float
@@ -877,6 +908,7 @@ namespace Urho3D
 - %Density : float
 - %Friction : float
 - %Restitution : float
+- %Vertices : Buffer
 
 ### CollisionShape
 - %Is %Enabled : bool
@@ -1015,6 +1047,7 @@ namespace Urho3D
 - %Layout %Mode : int
 - %Layout %Spacing : int
 - %Layout %Border : IntRect
+- %Layout %Flex %Scale : Vector2
 - %Indent : int
 - %Indent %Spacing : int
 - %Variables : VariantMap
@@ -1086,6 +1119,7 @@ namespace Urho3D
 - %Layout %Mode : int
 - %Layout %Spacing : int
 - %Layout %Border : IntRect
+- %Layout %Flex %Scale : Vector2
 - %Indent : int
 - %Indent %Spacing : int
 - %Variables : VariantMap
@@ -1167,6 +1201,7 @@ namespace Urho3D
 - %Layout %Mode : int
 - %Layout %Spacing : int
 - %Layout %Border : IntRect
+- %Layout %Flex %Scale : Vector2
 - %Indent : int
 - %Indent %Spacing : int
 - %Variables : VariantMap
@@ -1213,6 +1248,7 @@ namespace Urho3D
 - %Layout %Mode : int
 - %Layout %Spacing : int
 - %Layout %Border : IntRect
+- %Layout %Flex %Scale : Vector2
 - %Indent : int
 - %Indent %Spacing : int
 - %Variables : VariantMap
@@ -1222,6 +1258,8 @@ namespace Urho3D
 - %Auto %Show/Hide %Scrollbars : bool
 - %Scroll %Deceleration : float
 - %Scroll %Snap %Epsilon : float
+- %Auto %Disable %Children : bool
+- %Auto %Disable %Threshold : float
 - %Highlight %Mode : int
 - %Multiselect : bool
 - %Hierarchy %Mode : bool
@@ -1263,6 +1301,7 @@ namespace Urho3D
 - %Layout %Mode : int
 - %Layout %Spacing : int
 - %Layout %Border : IntRect
+- %Layout %Flex %Scale : Vector2
 - %Indent : int
 - %Indent %Spacing : int
 - %Variables : VariantMap
@@ -1339,14 +1378,14 @@ namespace Urho3D
 - %Light %Mask : int
 - %Shadow %Mask : int
 - %Zone %Mask : int
+- %Serialize %Particles : bool
 
 ### ParticleEmitter2D
 - %Particle %Effect : ResourceRef
+- %Sprite : ResourceRef
 - %Layer : int
 - %Order %in %Layer : int
-- %Sprite : ResourceRef
 - %Blend %Mode : int
-- %Material : ResourceRef
 - %Max %Lights : int
 - %View %Mask : int
 - %Light %Mask : int
@@ -1356,6 +1395,7 @@ namespace Urho3D
 ### PhysicsWorld
 - %Gravity : Vector3
 - %Physics %FPS : int
+- %Max %Substeps : int
 - %Solver %Iterations : int
 - %Net %Max %Angular %Vel. : float
 - %Interpolation : bool
@@ -1461,6 +1501,7 @@ namespace Urho3D
 - %Layout %Mode : int
 - %Layout %Spacing : int
 - %Layout %Border : IntRect
+- %Layout %Flex %Scale : Vector2
 - %Indent : int
 - %Indent %Spacing : int
 - %Variables : VariantMap
@@ -1503,6 +1544,7 @@ namespace Urho3D
 - %Layout %Mode : int
 - %Layout %Spacing : int
 - %Layout %Border : IntRect
+- %Layout %Flex %Scale : Vector2
 - %Indent : int
 - %Indent %Spacing : int
 - %Variables : VariantMap
@@ -1512,6 +1554,8 @@ namespace Urho3D
 - %Auto %Show/Hide %Scrollbars : bool
 - %Scroll %Deceleration : float
 - %Scroll %Snap %Epsilon : float
+- %Auto %Disable %Children : bool
+- %Auto %Disable %Threshold : float
 
 ### Skybox
 - %Is %Enabled : bool
@@ -1559,6 +1603,7 @@ namespace Urho3D
 - %Layout %Mode : int
 - %Layout %Spacing : int
 - %Layout %Border : IntRect
+- %Layout %Flex %Scale : Vector2
 - %Indent : int
 - %Indent %Spacing : int
 - %Variables : VariantMap
@@ -1580,7 +1625,7 @@ namespace Urho3D
 ### SoundSource
 - %Is %Enabled : bool
 - %Sound : ResourceRef
-- %Sound %Type : int
+- %Type : String
 - %Frequency : float
 - %Gain : float
 - %Attenuation : float
@@ -1592,7 +1637,7 @@ namespace Urho3D
 ### SoundSource3D
 - %Is %Enabled : bool
 - %Sound : ResourceRef
-- %Sound %Type : int
+- %Type : String
 - %Frequency : float
 - %Gain : float
 - %Is %Playing : bool
@@ -1669,14 +1714,13 @@ namespace Urho3D
 - %Instance %Nodes : VariantVector
 
 ### StaticSprite2D
+- %Sprite : ResourceRef
 - %Flip X : bool
 - %Flip Y : bool
 - %Color : Color
 - %Layer : int
 - %Order %in %Layer : int
-- %Sprite : ResourceRef
 - %Blend %Mode : int
-- %Material : ResourceRef
 - %Max %Lights : int
 - %View %Mask : int
 - %Light %Mask : int
@@ -1731,6 +1775,7 @@ namespace Urho3D
 - %Layout %Mode : int
 - %Layout %Spacing : int
 - %Layout %Border : IntRect
+- %Layout %Flex %Scale : Vector2
 - %Indent : int
 - %Indent %Spacing : int
 - %Variables : VariantMap
@@ -1801,6 +1846,7 @@ namespace Urho3D
 - %Layout %Mode : int
 - %Layout %Spacing : int
 - %Layout %Border : IntRect
+- %Layout %Flex %Scale : Vector2
 - %Indent : int
 - %Indent %Spacing : int
 - %Variables : VariantMap
@@ -1835,6 +1881,7 @@ namespace Urho3D
 - %Layout %Mode : int
 - %Layout %Spacing : int
 - %Layout %Border : IntRect
+- %Layout %Flex %Scale : Vector2
 - %Indent : int
 - %Indent %Spacing : int
 - %Variables : VariantMap
@@ -1868,6 +1915,7 @@ namespace Urho3D
 - %Layout %Mode : int
 - %Layout %Spacing : int
 - %Layout %Border : IntRect
+- %Layout %Flex %Scale : Vector2
 - %Indent : int
 - %Indent %Spacing : int
 - %Variables : VariantMap
@@ -1918,6 +1966,7 @@ namespace Urho3D
 - %Layout %Mode : int
 - %Layout %Spacing : int
 - %Layout %Border : IntRect
+- %Layout %Flex %Scale : Vector2
 - %Indent : int
 - %Indent %Spacing : int
 - %Variables : VariantMap
@@ -2365,7 +2414,9 @@ Properties:
 - float shadowDistance
 - uint shadowMask
 - float speed
+- Sprite2D@ sprite
 - bool temporary
+- Texture2D@ texture
 - StringHash type // readonly
 - String typeName // readonly
 - uint viewMask
@@ -2609,6 +2660,7 @@ Properties:
 
 Methods:
 
+- bool HasMasterGain(const String&) const
 - bool Play()
 - void SendEvent(const String&, VariantMap& = VariantMap ( ))
 - void SetMode(int, int, bool, bool = true)
@@ -2839,6 +2891,8 @@ Properties:
 - IntRect combinedScreenRect // readonly
 - XMLFile@ defaultStyle
 - float derivedOpacity // readonly
+- uint dragButtonCombo // readonly
+- int dragButtonCount // readonly
 - uint dragDropMode
 - bool editable
 - bool elementEventSender
@@ -2860,6 +2914,7 @@ Properties:
 - int indentWidth // readonly
 - bool internal
 - IntRect layoutBorder
+- Vector2 layoutFlexScale
 - LayoutMode layoutMode
 - int layoutSpacing
 - int maxHeight
@@ -3036,6 +3091,8 @@ Properties:
 - IntRect combinedScreenRect // readonly
 - XMLFile@ defaultStyle
 - float derivedOpacity // readonly
+- uint dragButtonCombo // readonly
+- int dragButtonCount // readonly
 - uint dragDropMode
 - bool editable
 - bool elementEventSender
@@ -3057,6 +3114,7 @@ Properties:
 - int indentWidth // readonly
 - bool internal
 - IntRect layoutBorder
+- Vector2 layoutFlexScale
 - LayoutMode layoutMode
 - int layoutSpacing
 - int maxHeight
@@ -3291,6 +3349,8 @@ Properties:
 - IntRect combinedScreenRect // readonly
 - XMLFile@ defaultStyle
 - float derivedOpacity // readonly
+- uint dragButtonCombo // readonly
+- int dragButtonCount // readonly
 - uint dragDropMode
 - bool editable
 - bool elementEventSender
@@ -3312,6 +3372,7 @@ Properties:
 - int indentWidth // readonly
 - bool internal
 - IntRect layoutBorder
+- Vector2 layoutFlexScale
 - LayoutMode layoutMode
 - int layoutSpacing
 - int maxHeight
@@ -4732,6 +4793,7 @@ Methods:
 - void BringToFront()
 - UIElement@ CreateChild(const String&, const String& = String ( ), uint = M_MAX_UNSIGNED)
 - void DefineShape(CursorShape, Texture@, const IntRect&, const IntVector2&)
+- void DefineShape(const String&, Texture@, const IntRect&, const IntVector2&)
 - void DisableLayoutUpdate()
 - IntVector2 ElementToScreen(const IntVector2&)
 - void EnableLayoutUpdate()
@@ -4790,6 +4852,8 @@ Methods:
 - void SetMinSize(int, int)
 - void SetParent(UIElement@, uint = M_MAX_UNSIGNED)
 - void SetPosition(int, int)
+- void SetShape(CursorShape)
+- void SetShape(const String&)
 - void SetSize(int, int)
 - bool SetStyle(const String&, XMLFile@ = null)
 - bool SetStyle(const XMLElement&)
@@ -4819,6 +4883,8 @@ Properties:
 - IntRect combinedScreenRect // readonly
 - XMLFile@ defaultStyle
 - float derivedOpacity // readonly
+- uint dragButtonCombo // readonly
+- int dragButtonCount // readonly
 - uint dragDropMode
 - bool editable
 - bool elementEventSender
@@ -4840,6 +4906,7 @@ Properties:
 - int indentWidth // readonly
 - bool internal
 - IntRect layoutBorder
+- Vector2 layoutFlexScale
 - LayoutMode layoutMode
 - int layoutSpacing
 - int maxHeight
@@ -4861,7 +4928,7 @@ Properties:
 - UIElement@ root // readonly
 - IntVector2 screenPosition // readonly
 - bool selected
-- CursorShape shape
+- String shape
 - IntVector2 size
 - bool sortChildren
 - String style
@@ -5319,7 +5386,6 @@ Properties:
 - int layer
 - uint lightMask
 - float lodBias
-- Material@ material
 - uint maxLights
 - Node@ node // readonly
 - uint numAttributes // readonly
@@ -5330,8 +5396,8 @@ Properties:
 - int refs // readonly
 - float shadowDistance
 - uint shadowMask
-- Sprite2D@ sprite
 - bool temporary
+- Texture2D@ texture
 - StringHash type // readonly
 - String typeName // readonly
 - uint viewMask
@@ -5449,6 +5515,8 @@ Properties:
 - IntRect combinedScreenRect // readonly
 - XMLFile@ defaultStyle
 - float derivedOpacity // readonly
+- uint dragButtonCombo // readonly
+- int dragButtonCount // readonly
 - uint dragDropMode
 - bool editable
 - bool elementEventSender
@@ -5471,6 +5539,7 @@ Properties:
 - bool internal
 - UIElement@[] items // readonly
 - IntRect layoutBorder
+- Vector2 layoutFlexScale
 - LayoutMode layoutMode
 - int layoutSpacing
 - ListView@ listView // readonly
@@ -5693,6 +5762,7 @@ Methods:
 - bool Rename(const String&, const String&)
 - String[]@ ScanDir(const String&, const String&, uint, bool) const
 - void SendEvent(const String&, VariantMap& = VariantMap ( ))
+- bool SetLastModifiedTime(const String&, uint)
 - int SystemCommand(const String&, bool = false)
 - uint SystemCommandAsync(const String&)
 - bool SystemOpen(const String&, const String&)
@@ -5730,6 +5800,7 @@ Properties:
 
 Methods:
 
+- IntVector2 GetTotalGlyphOffset(int) const
 - bool Load(File@)
 - bool Load(VectorBuffer&)
 - bool Save(File@) const
@@ -5741,11 +5812,13 @@ Methods:
 
 Properties:
 
+- IntVector2 absoluteGlyphOffset
 - StringHash baseType // readonly
 - String category // readonly
 - uint memoryUse // readonly
 - String name
 - int refs // readonly
+- Vector2 scaledGlyphOffset
 - StringHash type // readonly
 - String typeName // readonly
 - uint useTimer // readonly
@@ -5928,10 +6001,12 @@ Properties:
 - String category // readonly
 - uint components // readonly
 - bool compressed // readonly
+- CompressedFormat compressedFormat // readonly
 - int depth // readonly
 - int height // readonly
 - uint memoryUse // readonly
 - String name
+- uint numCompressedLevels // readonly
 - int refs // readonly
 - StringHash type // readonly
 - String typeName // readonly
@@ -5958,11 +6033,13 @@ Methods:
 - void RemoveAllGestures()
 - bool RemoveGesture(uint)
 - bool RemoveScreenJoystick(int)
+- void ResetMouseVisible()
 - bool SaveGesture(File@, uint)
 - bool SaveGesture(VectorBuffer&, uint)
 - bool SaveGestures(File@)
 - bool SaveGestures(VectorBuffer&)
 - void SendEvent(const String&, VariantMap& = VariantMap ( ))
+- void SetMouseVisible(bool, bool = false)
 
 Properties:
 
@@ -5977,6 +6054,7 @@ Properties:
 - bool[] mouseButtonDown // readonly
 - bool[] mouseButtonPress // readonly
 - bool mouseGrabbed
+- MouseMode mouseMode
 - IntVector2 mouseMove // readonly
 - int mouseMoveWheel // readonly
 - int mouseMoveX // readonly
@@ -6362,6 +6440,8 @@ Properties:
 - uint cursorPosition
 - XMLFile@ defaultStyle
 - float derivedOpacity // readonly
+- uint dragButtonCombo // readonly
+- int dragButtonCount // readonly
 - uint dragDropMode
 - uint echoCharacter
 - bool editable
@@ -6384,6 +6464,7 @@ Properties:
 - int indentWidth // readonly
 - bool internal
 - IntRect layoutBorder
+- Vector2 layoutFlexScale
 - LayoutMode layoutMode
 - int layoutSpacing
 - int maxHeight
@@ -6525,6 +6606,8 @@ Properties:
 - Variant[] attributeDefaults // readonly
 - AttributeInfo[] attributeInfos // readonly
 - Variant[] attributes
+- bool autoDisableChildren
+- float autoDisableThreshold
 - int baseIndent
 - StringHash baseType // readonly
 - bool bringToBack
@@ -6542,6 +6625,8 @@ Properties:
 - UIElement@ contentElement // readonly
 - XMLFile@ defaultStyle
 - float derivedOpacity // readonly
+- uint dragButtonCombo // readonly
+- int dragButtonCount // readonly
 - uint dragDropMode
 - bool editable
 - bool elementEventSender
@@ -6564,6 +6649,7 @@ Properties:
 - bool internal
 - UIElement@[] items // readonly
 - IntRect layoutBorder
+- Vector2 layoutFlexScale
 - LayoutMode layoutMode
 - int layoutSpacing
 - int maxHeight
@@ -6677,8 +6763,10 @@ Properties:
 - uint memoryUse // readonly
 - String name
 - uint numTechniques
+- uint numUsedTextureUnits // readonly
 - bool occlusion // readonly
 - int refs // readonly
+- Scene@ scene
 - String[]@ shaderParameterNames // readonly
 - Variant[] shaderParameters
 - CullMode shadowCullMode
@@ -6897,6 +6985,8 @@ Properties:
 - IntRect combinedScreenRect // readonly
 - XMLFile@ defaultStyle
 - float derivedOpacity // readonly
+- uint dragButtonCombo // readonly
+- int dragButtonCount // readonly
 - uint dragDropMode
 - bool editable
 - bool elementEventSender
@@ -6918,6 +7008,7 @@ Properties:
 - int indentWidth // readonly
 - bool internal
 - IntRect layoutBorder
+- Vector2 layoutFlexScale
 - LayoutMode layoutMode
 - int layoutSpacing
 - int maxHeight
@@ -7567,15 +7658,25 @@ Properties:
 
 Methods:
 
+- void AddColorFrame(ColorFrame@)
+- void AddColorTime(Color&, float)
+- void AddTextureFrame(TextureFrame@)
+- void AddTextureTime(Rect&, float)
 - ColorFrame@ GetColorFrame(uint) const
 - TextureFrame@ GetTextureFrame(uint) const
 - bool Load(File@)
 - bool Load(VectorBuffer&)
+- bool Load(const XMLElement&)
+- void RemoveColorFrame(uint)
+- void RemoveTextureFrame(uint)
 - bool Save(File@) const
 - bool Save(VectorBuffer&) const
+- bool Save(XMLElement&) const
 - void SendEvent(const String&, VariantMap& = VariantMap ( ))
-- void SetColorFrame(uint, ColorFrame@) const
-- void SetTextureFrame(uint, TextureFrame@) const
+- void SetColorFrame(uint, ColorFrame@)
+- void SetTextureFrame(uint, TextureFrame@)
+- void SortColorFrames()
+- void SortTextureFrames()
 
 Properties:
 
@@ -7591,7 +7692,7 @@ Properties:
 - Material@ material
 - Vector3 maxDirection
 - float maxEmissionRate
-- Vector3 maxParticleSize
+- Vector2 maxParticleSize
 - float maxRotation
 - float maxRotationSpeed
 - float maxTimeToLive
@@ -7605,9 +7706,9 @@ Properties:
 - float minTimeToLive
 - float minVelocity
 - String name
-- uint numColorFrames // readonly
+- uint numColorFrames
 - uint numParticles
-- uint numTextureFrames // readonly
+- uint numTextureFrames
 - int refs // readonly
 - bool relative
 - bool scaled
@@ -7713,6 +7814,7 @@ Properties:
 - int refs // readonly
 - bool relative
 - bool scaled
+- bool serializeParticles
 - float shadowDistance
 - uint shadowMask
 - bool sorted
@@ -7775,7 +7877,6 @@ Properties:
 - int layer
 - uint lightMask
 - float lodBias
-- Material@ material
 - uint maxLights
 - Node@ node // readonly
 - uint numAttributes // readonly
@@ -7788,6 +7889,7 @@ Properties:
 - uint shadowMask
 - Sprite2D@ sprite
 - bool temporary
+- Texture2D@ texture
 - StringHash type // readonly
 - String typeName // readonly
 - uint viewMask
@@ -7805,6 +7907,7 @@ Properties:
 - BlendMode blendMode
 - CompareMode depthTestMode
 - bool depthWrite
+- bool desktop
 - PassLightingMode lightingMode
 - String pixelShader
 - String pixelShaderDefines
@@ -7891,6 +7994,7 @@ Properties:
 - uint id // readonly
 - bool internalEdge
 - bool interpolation
+- int maxSubSteps
 - Node@ node // readonly
 - uint numAttributes // readonly
 - int numIterations
@@ -8078,6 +8182,7 @@ Methods:
 - float Distance(const Vector3&) const
 - float HitDistance(const BoundingBox&) const
 - float HitDistance(const Frustum&, bool = true) const
+- float HitDistance(const Plane&) const
 - float HitDistance(const Sphere&) const
 - float HitDistance(const Vector3&, const Vector3&, const Vector3&) const
 - Vector3 Project(const Vector3&) const
@@ -8931,6 +9036,8 @@ Properties:
 - IntRect combinedScreenRect // readonly
 - XMLFile@ defaultStyle
 - float derivedOpacity // readonly
+- uint dragButtonCombo // readonly
+- int dragButtonCount // readonly
 - uint dragDropMode
 - bool editable
 - float effectiveScrollStep // readonly
@@ -8951,6 +9058,7 @@ Properties:
 - int indentWidth // readonly
 - bool internal
 - IntRect layoutBorder
+- Vector2 layoutFlexScale
 - LayoutMode layoutMode
 - int layoutSpacing
 - int maxHeight
@@ -9073,6 +9181,8 @@ Properties:
 - Variant[] attributeDefaults // readonly
 - AttributeInfo[] attributeInfos // readonly
 - Variant[] attributes
+- bool autoDisableChildren
+- float autoDisableThreshold
 - StringHash baseType // readonly
 - bool bringToBack
 - bool bringToFront
@@ -9088,6 +9198,8 @@ Properties:
 - UIElement@ contentElement
 - XMLFile@ defaultStyle
 - float derivedOpacity // readonly
+- uint dragButtonCombo // readonly
+- int dragButtonCount // readonly
 - uint dragDropMode
 - bool editable
 - bool elementEventSender
@@ -9107,6 +9219,7 @@ Properties:
 - int indentWidth // readonly
 - bool internal
 - IntRect layoutBorder
+- Vector2 layoutFlexScale
 - LayoutMode layoutMode
 - int layoutSpacing
 - int maxHeight
@@ -9405,6 +9518,8 @@ Properties:
 - IntRect combinedScreenRect // readonly
 - XMLFile@ defaultStyle
 - float derivedOpacity // readonly
+- uint dragButtonCombo // readonly
+- int dragButtonCount // readonly
 - uint dragDropMode
 - bool editable
 - bool elementEventSender
@@ -9427,6 +9542,7 @@ Properties:
 - bool internal
 - BorderImage@ knob // readonly
 - IntRect layoutBorder
+- Vector2 layoutFlexScale
 - LayoutMode layoutMode
 - int layoutSpacing
 - int maxHeight
@@ -9659,7 +9775,7 @@ Properties:
 - bool playing // readonly
 - int refs // readonly
 - Sound@ sound // readonly
-- SoundType soundType
+- String soundType
 - bool temporary
 - float timePosition // readonly
 - StringHash type // readonly
@@ -9729,7 +9845,7 @@ Properties:
 - int refs // readonly
 - float rolloffFactor
 - Sound@ sound // readonly
-- SoundType soundType
+- String soundType
 - bool temporary
 - float timePosition // readonly
 - StringHash type // readonly
@@ -9925,6 +10041,8 @@ Properties:
 - Color[] colors
 - XMLFile@ defaultStyle
 - float derivedOpacity // readonly
+- uint dragButtonCombo // readonly
+- int dragButtonCount // readonly
 - bool elementEventSender
 - int height
 - HorizontalAlignment horizontalAlignment
@@ -10213,7 +10331,6 @@ Properties:
 - int layer
 - uint lightMask
 - float lodBias
-- Material@ material
 - uint maxLights
 - Node@ node // readonly
 - uint numAttributes // readonly
@@ -10226,6 +10343,7 @@ Properties:
 - uint shadowMask
 - Sprite2D@ sprite
 - bool temporary
+- Texture2D@ texture
 - StringHash type // readonly
 - String typeName // readonly
 - uint viewMask
@@ -10310,6 +10428,8 @@ Properties:
 Methods:
 
 - Pass@ CreatePass(StringHash)
+- Pass@ GetPass(StringHash)
+- Pass@ GetSupportedPass(StringHash)
 - bool HasPass(StringHash) const
 - bool Load(File@)
 - bool Load(VectorBuffer&)
@@ -10322,11 +10442,15 @@ Properties:
 
 - StringHash baseType // readonly
 - String category // readonly
+- bool desktop
 - uint memoryUse // readonly
 - String name
-- Pass@[] passes // readonly
+- uint numPasses // readonly
+- StringHash[]@ passTypes // readonly
+- Pass@[]@ passes // readonly
 - int refs // readonly
 - bool sm3
+- bool supported // readonly
 - StringHash type // readonly
 - String typeName // readonly
 - uint useTimer // readonly
@@ -10578,6 +10702,8 @@ Properties:
 - IntRect combinedScreenRect // readonly
 - XMLFile@ defaultStyle
 - float derivedOpacity // readonly
+- uint dragButtonCombo // readonly
+- int dragButtonCount // readonly
 - uint dragDropMode
 - bool editable
 - Color effectColor
@@ -10600,6 +10726,7 @@ Properties:
 - int indentWidth // readonly
 - bool internal
 - IntRect layoutBorder
+- Vector2 layoutFlexScale
 - LayoutMode layoutMode
 - int layoutSpacing
 - int maxHeight
@@ -11047,7 +11174,7 @@ Properties:
 - Variant[] attributes
 - StringHash baseType // readonly
 - String category // readonly
-- int drawOrder // writeonly
+- int drawOrder
 - bool enabled
 - bool enabledEffective // readonly
 - int height // readonly
@@ -11059,7 +11186,6 @@ Properties:
 - uint numObjects // readonly
 - ObjectAnimation@ objectAnimation
 - int refs // readonly
-- int rrawOrder // readonly
 - bool temporary
 - StringHash type // readonly
 - String typeName // readonly
@@ -11106,6 +11232,7 @@ Properties:
 - uint frameNumber // readonly
 - int refs // readonly
 - uint systemTime // readonly
+- uint timeSinceEpoch // readonly
 - String timeStamp // readonly
 - float timeStep // readonly
 - StringHash type // readonly
@@ -11239,6 +11366,8 @@ Properties:
 - XMLFile@ defaultStyle
 - float delay
 - float derivedOpacity // readonly
+- uint dragButtonCombo // readonly
+- int dragButtonCount // readonly
 - uint dragDropMode
 - bool editable
 - bool elementEventSender
@@ -11257,6 +11386,7 @@ Properties:
 - int indentWidth // readonly
 - bool internal
 - IntRect layoutBorder
+- Vector2 layoutFlexScale
 - LayoutMode layoutMode
 - int layoutSpacing
 - int maxHeight
@@ -11316,6 +11446,7 @@ Methods:
 - UIElement@ GetElementAt(const IntVector2&, bool = true)
 - UIElement@ GetElementAt(int, int, bool = true)
 - bool HasModalElement() const
+- bool IsDragging() const
 - UIElement@ LoadLayout(File@)
 - UIElement@ LoadLayout(File@, XMLFile@)
 - UIElement@ LoadLayout(VectorBuffer&)
@@ -11326,6 +11457,7 @@ Methods:
 - bool SaveLayout(VectorBuffer&, UIElement@)
 - void SendEvent(const String&, VariantMap& = VariantMap ( ))
 - void SetFocusElement(UIElement@, bool = false)
+- const UIElement@[]@ GetDragElements()
 
 Properties:
 
@@ -11338,7 +11470,6 @@ Properties:
 - float doubleClickInterval
 - int dragBeginDistance
 - float dragBeginInterval
-- UIElement@ dragElement // readonly
 - UIElement@ focusElement
 - bool forceAutoHint
 - UIElement@ frontElement // readonly
@@ -11447,6 +11578,8 @@ Properties:
 - IntRect combinedScreenRect // readonly
 - XMLFile@ defaultStyle
 - float derivedOpacity // readonly
+- uint dragButtonCombo // readonly
+- int dragButtonCount // readonly
 - uint dragDropMode
 - bool editable
 - bool elementEventSender
@@ -11465,6 +11598,7 @@ Properties:
 - int indentWidth // readonly
 - bool internal
 - IntRect layoutBorder
+- Vector2 layoutFlexScale
 - LayoutMode layoutMode
 - int layoutSpacing
 - int maxHeight
@@ -11511,7 +11645,7 @@ Methods:
 - bool Save(File@) const
 - bool Save(VectorBuffer&) const
 - void SendEvent(const String&, VariantMap& = VariantMap ( ))
-- void SetEventFrame(float, const String&, const Variant&)
+- void SetEventFrame(float, const String&, const VariantMap& = VariantMap ( ))
 - void SetKeyFrame(float, const Variant&)
 
 Properties:
@@ -11544,6 +11678,7 @@ Methods:
 - float GetFloat() const
 - int GetInt() const
 - RefCounted@ GetPtr() const
+- ScriptObject@ GetScriptObject() const
 - StringHash GetStringHash() const
 - uint GetUInt() const
 - Variant[]@ GetVariantVector() const
@@ -11807,7 +11942,7 @@ Methods:
 - bool SetStyle(const String&, XMLFile@ = null)
 - bool SetStyle(const XMLElement&)
 - bool SetStyleAuto(XMLFile@ = null)
-- void SetView(Scene@, Camera@)
+- void SetView(Scene@, Camera@, bool = true)
 - void UpdateLayout()
 - const Variant& GetVar(const StringHash&)
 
@@ -11834,6 +11969,8 @@ Properties:
 - XMLFile@ defaultStyle
 - Texture2D@ depthTexture // readonly
 - float derivedOpacity // readonly
+- uint dragButtonCombo // readonly
+- int dragButtonCount // readonly
 - uint dragDropMode
 - bool editable
 - bool elementEventSender
@@ -11855,6 +11992,7 @@ Properties:
 - int indentWidth // readonly
 - bool internal
 - IntRect layoutBorder
+- Vector2 layoutFlexScale
 - LayoutMode layoutMode
 - int layoutSpacing
 - int maxHeight
@@ -12034,6 +12172,8 @@ Properties:
 - IntRect combinedScreenRect // readonly
 - XMLFile@ defaultStyle
 - float derivedOpacity // readonly
+- uint dragButtonCombo // readonly
+- int dragButtonCount // readonly
 - uint dragDropMode
 - bool editable
 - bool elementEventSender
@@ -12054,6 +12194,7 @@ Properties:
 - int indentWidth // readonly
 - bool internal
 - IntRect layoutBorder
+- Vector2 layoutFlexScale
 - LayoutMode layoutMode
 - int layoutSpacing
 - int maxHeight
@@ -12355,6 +12496,20 @@ Properties:
 - CMP_GREATEREQUAL
 
 
+### CompressedFormat
+
+- CF_NONE
+- CF_RGBA
+- CF_DXT1
+- CF_DXT3
+- CF_DXT5
+- CF_ETC1
+- CF_PVRTC_RGB_2BPP
+- CF_PVRTC_RGBA_2BPP
+- CF_PVRTC_RGB_4BPP
+- CF_PVRTC_RGBA_4BPP
+
+
 ### ConstraintType
 
 - CONSTRAINT_POINT
@@ -12397,13 +12552,17 @@ Properties:
 ### CursorShape
 
 - CS_NORMAL
+- CS_IBEAM
+- CS_CROSS
 - CS_RESIZEVERTICAL
 - CS_RESIZEDIAGONAL_TOPRIGHT
 - CS_RESIZEHORIZONTAL
 - CS_RESIZEDIAGONAL_TOPLEFT
+- CS_RESIZE_ALL
 - CS_ACCEPTDROP
 - CS_REJECTDROP
 - CS_BUSY
+- CS_BUSY_ARROW
 
 
 ### DumpMode
@@ -12530,6 +12689,13 @@ Properties:
 - LM_FORCE_CLAMPED
 
 
+### MouseMode
+
+- MM_ABSOLUTE
+- MM_RELATIVE
+- MM_WRAP
+
+
 ### Orientation
 
 - O_HORIZONTAL
@@ -12610,15 +12776,6 @@ Properties:
 - SHAPE_TERRAIN
 
 
-### SoundType
-
-- SOUND_EFFECT
-- SOUND_AMBIENT
-- SOUND_VOICE
-- SOUND_MUSIC
-- SOUND_MASTER
-
-
 ### TextEffect
 
 - TE_NONE
@@ -12669,6 +12826,7 @@ Properties:
 - TU_VOLUMEMAP
 - TU_ZONE
 - MAX_MATERIAL_TEXTURE_UNITS
+- MAX_NAMED_TEXTURE_UNITS
 - MAX_TEXTURE_UNITS
 
 
@@ -12763,6 +12921,7 @@ Properties:
 - void ClearDelayedExecute(const String& = String ( ))
 - VectorBuffer CompressVectorBuffer(VectorBuffer&)
 - float Cos(float)
+- uint CountSetBits(uint)
 - VectorBuffer DecompressVectorBuffer(VectorBuffer&)
 - void DelayedExecute(float, bool, const String&)
 - void DelayedExecute(float, bool, const String&, const Variant[]@)
@@ -12922,8 +13081,8 @@ Properties:
 - uint DEFAULT_VIEWMASK
 - uint DRAWABLE_ANY
 - uint DRAWABLE_GEOMETRY
+- uint DRAWABLE_GEOMETRY2D
 - uint DRAWABLE_LIGHT
-- uint DRAWABLE_PROXYGEOMETRY
 - uint DRAWABLE_ZONE
 - uint FIRST_LOCAL_ID
 - uint FIRST_REPLICATED_ID
@@ -13331,6 +13490,11 @@ Properties:
 - int SHADOWQUALITY_HIGH_24BIT
 - int SHADOWQUALITY_LOW_16BIT
 - int SHADOWQUALITY_LOW_24BIT
+- String SOUND_AMBIENT
+- String SOUND_EFFECT
+- String SOUND_MASTER
+- String SOUND_MUSIC
+- String SOUND_VOICE
 - Color TRANSPARENT
 - uint VO_DISABLE_OCCLUSION
 - uint VO_DISABLE_SHADOWS

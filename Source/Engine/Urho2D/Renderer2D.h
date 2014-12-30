@@ -29,21 +29,24 @@ namespace Urho3D
 
 class Drawable2D;
 class IndexBuffer;
+class Material;
 class VertexBuffer;
 
-/// Proxy for 2D visible components.
-class URHO3D_API DrawableProxy2D : public Drawable
+/// 2D renderer components.
+class URHO3D_API Renderer2D : public Drawable
 {
-    OBJECT(DrawableProxy2D);
+    OBJECT(Renderer2D);
 
 public:
     /// Construct.
-    DrawableProxy2D(Context* context);
+    Renderer2D(Context* context);
     /// Destruct.
-    ~DrawableProxy2D();
+    ~Renderer2D();
     /// Register object factory.
     static void RegisterObject(Context* context);
 
+    /// Process octree raycast. May be called from a worker thread.
+    virtual void ProcessRayQuery(const RayOctreeQuery& query, PODVector<RayQueryResult>& results);
     /// Calculate distance and prepare batches for rendering. May be called from worker thread(s), possibly re-entrantly.
     virtual void UpdateBatches(const FrameInfo& frame);
     /// Prepare geometry for rendering. Called from a worker thread if possible (no GPU update.)
@@ -51,12 +54,14 @@ public:
     /// Return whether a geometry update is necessary, and if it can happen in a worker thread.
     virtual UpdateGeometryType GetUpdateGeometryType();
 
-    /// Add drawable.
+    /// Add Drawable2D.
     void AddDrawable(Drawable2D* drawable);
-    /// Remove drawable.
+    /// Remove Drawable2D.
     void RemoveDrawable(Drawable2D* drawable);
+    /// Mark material dirty.
+    void MarkMaterialDirty(Drawable2D* drawable);
     /// Mark order dirty.
-    void MarkOrderDirty() { orderDirty_ = true; }
+    void MarkOrderDirty(){ orderDirty_ = true; }
     /// Check visibility.
     bool CheckVisibility(Drawable2D* drawable) const;
 
@@ -65,6 +70,12 @@ private:
     virtual void OnWorldBoundingBoxUpdate();
     /// Handle view update begin event. Determine Drawable2D's and their batches here.
     void HandleBeginViewUpdate(StringHash eventType, VariantMap& eventData);
+    /// Get all drawables in node.
+    void GetDrawables(PODVector<Drawable2D*>& drawables, Node* node);
+    /// Return material by texture and blend mode.
+    Material* GetMaterial(Texture2D* texture, BlendMode blendMode);
+    /// Create new material by texture and blend mode.
+    Material* CreateMaterial(Texture2D* Texture, BlendMode blendMode);
     /// Add batch.
     void AddBatch(Material* material, unsigned indexStart, unsigned indexCount, unsigned vertexStart, unsigned vertexCount);
 
@@ -72,14 +83,16 @@ private:
     SharedPtr<IndexBuffer> indexBuffer_;
     /// Vertex buffer.
     SharedPtr<VertexBuffer> vertexBuffer_;
+    /// Drawables.
+    PODVector<Drawable2D*> drawables_;
+    /// Material dirty drawables.
+    PODVector<Drawable2D*> materialDirtyDrawables_;
+    /// Order dirty.
+    bool orderDirty_;
     /// Materials.
     Vector<SharedPtr<Material> > materials_;
     /// Geometries.
     Vector<SharedPtr<Geometry> > geometries_;
-    /// Drawables.
-    PODVector<Drawable2D*> drawables_;
-    /// Order dirty.
-    bool orderDirty_;
     /// Frustum for current frame.
     const Frustum* frustum_;
     /// Frustum bounding box for current frame.
@@ -88,6 +101,8 @@ private:
     unsigned indexCount_;
     /// Total vertex count for the current frame.
     unsigned vertexCount_;
+    /// Cached materials.
+    HashMap<Texture2D*, HashMap<int, SharedPtr<Material> > > cachedMaterials_;
 };
 
 }

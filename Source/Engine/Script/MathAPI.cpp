@@ -79,6 +79,7 @@ static void RegisterMathFunctions(asIScriptEngine* engine)
     engine->RegisterGlobalFunction("float Ceil(float)", asFUNCTION(ceilf), asCALL_CDECL);
     engine->RegisterGlobalFunction("bool IsPowerOfTwo(uint)", asFUNCTION(IsPowerOfTwo), asCALL_CDECL);
     engine->RegisterGlobalFunction("uint NextPowerOfTwo(uint)", asFUNCTION(NextPowerOfTwo), asCALL_CDECL);
+    engine->RegisterGlobalFunction("uint CountSetBits(uint)", asFUNCTION(CountSetBits), asCALL_CDECL);
     engine->RegisterGlobalFunction("uint SDBMHash(uint, uint8)", asFUNCTION(SDBMHash), asCALL_CDECL);
     engine->RegisterGlobalFunction("float Random()", asFUNCTIONPR(Random, (), float), asCALL_CDECL);
     engine->RegisterGlobalFunction("float Random(float)", asFUNCTIONPR(Random, (float), float), asCALL_CDECL);
@@ -766,6 +767,7 @@ static void RegisterRay(asIScriptEngine* engine)
     engine->RegisterObjectMethod("Ray", "Vector3 Project(const Vector3&in) const", asMETHOD(Ray, Project), asCALL_THISCALL);
     engine->RegisterObjectMethod("Ray", "float Distance(const Vector3&in) const", asMETHOD(Ray, Distance), asCALL_THISCALL);
     engine->RegisterObjectMethod("Ray", "Vector3 ClosestPoint(const Ray&in) const", asMETHOD(Ray, ClosestPoint), asCALL_THISCALL);
+    engine->RegisterObjectMethod("Ray", "float HitDistance(const Plane&in) const", asMETHODPR(Ray, HitDistance, (const Plane&) const, float), asCALL_THISCALL);
     engine->RegisterObjectMethod("Ray", "float HitDistance(const Sphere&in) const", asMETHODPR(Ray, HitDistance, (const Sphere&) const, float), asCALL_THISCALL);
     engine->RegisterObjectMethod("Ray", "float HitDistance(const BoundingBox&in) const", asMETHODPR(Ray, HitDistance, (const BoundingBox&) const, float), asCALL_THISCALL);
     engine->RegisterObjectMethod("Ray", "float HitDistance(const Frustum&in, bool solidInside = true) const", asMETHODPR(Ray, HitDistance, (const Frustum&, bool) const, float), asCALL_THISCALL);

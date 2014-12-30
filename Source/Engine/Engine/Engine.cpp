@@ -49,7 +49,9 @@
 #include "Scene.h"
 #include "SceneEvents.h"
 #include "UI.h"
+#ifdef URHO3D_URHO2D
 #include "Urho2D.h"
+#endif
 #include "WorkQueue.h"
 #include "XMLFile.h"
 
@@ -161,8 +163,10 @@ bool Engine::Initialize(const VariantMap& parameters)
         RegisterGraphicsLibrary(context_);
     }
 
+#ifdef URHO3D_URHO2D
     // 2D graphics library is dependent on 3D graphics library
     RegisterUrho2DLibrary(context_);
+#endif
 
     // Start logging
     Log* log = GetSubsystem<Log>();
@@ -196,9 +200,9 @@ bool Engine::Initialize(const VariantMap& parameters)
     FileSystem* fileSystem = GetSubsystem<FileSystem>();
     String exePath = fileSystem->GetProgramDir();
 
-    Vector<String> resourcePaths = GetParameter(parameters, "ResourcePaths", "CoreData;Data").GetString().Split(';');
+    Vector<String> resourcePaths = GetParameter(parameters, "ResourcePaths", "Data;CoreData").GetString().Split(';');
     Vector<String> resourcePackages = GetParameter(parameters, "ResourcePackages").GetString().Split(';');
-    Vector<String> autoloadFolders = GetParameter(parameters, "AutoloadPaths", "Extra").GetString().Split(';');
+    Vector<String> autoloadPaths = GetParameter(parameters, "AutoloadPaths", "Extra").GetString().Split(';');
 
     for (unsigned i = 0; i < resourcePaths.Size(); ++i)
     {
@@ -262,24 +266,27 @@ bool Engine::Initialize(const VariantMap& parameters)
         }
     }
     
-    // Add auto load folders
-    for (unsigned i = 0; i < autoloadFolders.Size(); ++i)
+    // Add auto load folders. Prioritize these (if exist) before the default folders
+    for (unsigned i = 0; i < autoloadPaths.Size(); ++i)
     {
         bool success = true;
-        String autoloadFolder = autoloadFolders[i];
+        String autoloadPath = autoloadPaths[i];
+        if (!IsAbsolutePath(autoloadPath))
+            autoloadPath = exePath + autoloadPath;
+
         String badResource;
-        if (fileSystem->DirExists(autoloadFolder))
+        if (fileSystem->DirExists(autoloadPath))
         {
             Vector<String> folders;
-            fileSystem->ScanDir(folders, autoloadFolder, "*", SCAN_DIRS, false);
+            fileSystem->ScanDir(folders, autoloadPath, "*", SCAN_DIRS, false);
             for (unsigned y = 0; y < folders.Size(); ++y)
             {
                 String folder = folders[y];
                 if (folder.StartsWith("."))
                     continue;
 
-                String autoResourceDir = exePath + autoloadFolder + "/" + folder;
-                success = cache->AddResourceDir(autoResourceDir);
+                String autoResourceDir = autoloadPath + "/" + folder;
+                success = cache->AddResourceDir(autoResourceDir, 0);
                 if (!success)
                 {
                     badResource = folder;
@@ -290,17 +297,17 @@ bool Engine::Initialize(const VariantMap& parameters)
             if (success)
             {
                 Vector<String> paks;
-                fileSystem->ScanDir(paks, autoloadFolder, "*.pak", SCAN_FILES, false);
+                fileSystem->ScanDir(paks, autoloadPath, "*.pak", SCAN_FILES, false);
                 for (unsigned y = 0; y < paks.Size(); ++y)
                 {
                     String pak = paks[y];
                     if (pak.StartsWith("."))
                         continue;
 
-                    String autoResourcePak = exePath + autoloadFolder + "/" + pak;
+                    String autoResourcePak = autoloadPath + "/" + pak;
                     SharedPtr<PackageFile> package(new PackageFile(context_));
                     if (package->Open(autoResourcePak))
-                        cache->AddPackageFile(package);
+                        cache->AddPackageFile(package, 0);
                     else
                     {
                         badResource = autoResourcePak;
@@ -311,11 +318,11 @@ bool Engine::Initialize(const VariantMap& parameters)
             }
         }
         else
-            LOGWARNING("Skipped autoload folder " + autoloadFolders[i] + " as it does not exist");
+            LOGWARNING("Skipped autoload folder " + autoloadPaths[i] + " as it does not exist");
 
         if (!success)
         {
-            LOGERROR("Failed to add resource " + badResource + " in autoload folder " + autoloadFolders[i]);
+            LOGERROR("Failed to add resource " + badResource + " in autoload folder " + autoloadPaths[i]);
             return false;
         }
     }
@@ -333,7 +340,10 @@ bool Engine::Initialize(const VariantMap& parameters)
         graphics->SetWindowIcon(cache->GetResource<Image>(GetParameter(parameters, "WindowIcon", String::EMPTY).GetString()));
         graphics->SetFlushGPU(GetParameter(parameters, "FlushGPU", false).GetBool());
         graphics->SetOrientations(GetParameter(parameters, "Orientations", "LandscapeLeft LandscapeRight").GetString());
-        
+
+        if (HasParameter(parameters, "WindowPositionX") && HasParameter(parameters, "WindowPositionY"))
+            graphics->SetWindowPosition(GetParameter(parameters, "WindowPositionX").GetInt(), GetParameter(parameters, "WindowPositionY").GetInt());
+
         if (!graphics->SetMode(
             GetParameter(parameters, "WindowWidth", 0).GetInt(),
             GetParameter(parameters, "WindowHeight", 0).GetInt(),

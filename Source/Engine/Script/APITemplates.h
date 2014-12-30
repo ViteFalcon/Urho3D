@@ -788,8 +788,8 @@ template <class T> void RegisterSoundSource(asIScriptEngine* engine, const char*
     engine->RegisterObjectMethod(className, "void Play(Sound@+, float, float)", asMETHODPR(T, Play, (Sound*, float, float), void), asCALL_THISCALL);
     engine->RegisterObjectMethod(className, "void Play(Sound@+, float, float, float)", asMETHODPR(T, Play, (Sound*, float, float, float), void), asCALL_THISCALL);
     engine->RegisterObjectMethod(className, "void Stop()", asMETHOD(T, Stop), asCALL_THISCALL);
-    engine->RegisterObjectMethod(className, "void set_soundType(SoundType)", asMETHOD(T, SetSoundType), asCALL_THISCALL);
-    engine->RegisterObjectMethod(className, "SoundType get_soundType() const", asMETHOD(T, GetSoundType), asCALL_THISCALL);
+    engine->RegisterObjectMethod(className, "void set_soundType(const String&in)", asMETHOD(T, SetSoundType), asCALL_THISCALL);
+    engine->RegisterObjectMethod(className, "String get_soundType() const", asMETHOD(T, GetSoundType), asCALL_THISCALL);
     engine->RegisterObjectMethod(className, "void set_frequency(float)", asMETHOD(T, SetFrequency), asCALL_THISCALL);
     engine->RegisterObjectMethod(className, "float get_frequency() const", asMETHOD(T, GetFrequency), asCALL_THISCALL);
     engine->RegisterObjectMethod(className, "void set_gain(float)", asMETHOD(T, SetGain), asCALL_THISCALL);
@@ -1112,6 +1112,8 @@ template <class T> void RegisterUIElement(asIScriptEngine* engine, const char* c
         engine->RegisterObjectMethod(className, "int get_layoutSpacing() const", asMETHOD(T, GetLayoutSpacing), asCALL_THISCALL);
         engine->RegisterObjectMethod(className, "void set_layoutBorder(const IntRect&)", asMETHOD(T, SetLayoutBorder), asCALL_THISCALL);
         engine->RegisterObjectMethod(className, "const IntRect& get_layoutBorder() const", asMETHOD(T, GetLayoutBorder), asCALL_THISCALL);
+        engine->RegisterObjectMethod(className, "void set_layoutFlexScale(const Vector2&)", asMETHOD(T, SetLayoutFlexScale), asCALL_THISCALL);
+        engine->RegisterObjectMethod(className, "const Vector2& get_layoutFlexScale() const", asMETHOD(T, GetLayoutFlexScale), asCALL_THISCALL);
         engine->RegisterObjectMethod(className, "void set_indent(int)", asMETHOD(T, SetIndent), asCALL_THISCALL);
         engine->RegisterObjectMethod(className, "int get_indent() const", asMETHOD(T, GetIndent), asCALL_THISCALL);
         engine->RegisterObjectMethod(className, "void set_indentSpacing(int)", asMETHOD(T, SetIndentSpacing), asCALL_THISCALL);
@@ -1128,6 +1130,8 @@ template <class T> void RegisterUIElement(asIScriptEngine* engine, const char* c
     engine->RegisterObjectMethod(className, "void set_parent(UIElement@+)", asFUNCTION(UIElementSetParent), asCALL_CDECL_OBJLAST);
     engine->RegisterObjectMethod(className, "UIElement@+ get_parent() const", asMETHOD(T, GetParent), asCALL_THISCALL);
     engine->RegisterObjectMethod(className, "UIElement@+ get_root() const", asMETHOD(T, GetRoot), asCALL_THISCALL);
+    engine->RegisterObjectMethod(className, "int get_dragButtonCount() const", asMETHOD(T, GetDragButtonCount), asCALL_THISCALL);
+    engine->RegisterObjectMethod(className, "uint get_dragButtonCombo() const", asMETHOD(T, GetDragButtonCombo), asCALL_THISCALL);
     if (!isSprite)
     {
         engine->RegisterObjectMethod(className, "const IntVector2& get_screenPosition()", asMETHOD(T, GetScreenPosition), asCALL_THISCALL);

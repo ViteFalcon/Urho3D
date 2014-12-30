@@ -53,6 +53,7 @@ function CreateScene()
     local camera = cameraNode:CreateComponent("Camera")
     camera.orthographic = true
     camera.orthoSize = graphics.height * PIXEL_SIZE
+    camera.zoom = 1.5 * Min(graphics.width / 1280, graphics.height / 800) -- Set zoom according to user's resolution to ensure full visibility (initial zoom (1.5) is set for full visibility at 1280x800 resolution)
 
     local animationSet = cache:GetResource("AnimationSet2D", "Urho2D/imp/imp.scml")
     if animationSet == nil then
@@ -60,7 +61,7 @@ function CreateScene()
     end
 
     spriteNode = scene_:CreateChild("SpriterAnimation")
-    spriteNode.position = Vector3(-1.4, 2.0, 0.0)
+    spriteNode.position = Vector3(0.0, 2.0, 0.0)
 
     local animatedSprite = spriteNode:CreateComponent("AnimatedSprite2D")
     animatedSprite:SetAnimation(animationSet, animationNames[animationIndex + 1])
@@ -69,8 +70,9 @@ end
 function CreateInstructions()
     -- Construct new Text object, set string to display and font to use
     local instructionText = ui.root:CreateChild("Text")
-    instructionText:SetText("Click mouse to play next animation, \nUse WASD keys and mouse to move, Use PageUp PageDown to zoom.")
+    instructionText:SetText("Mouse click to play next animation, \nUse WASD keys and mouse to move, Use PageUp PageDown to zoom.")
     instructionText:SetFont(cache:GetResource("Font", "Fonts/Anonymous Pro.ttf"), 15)
+    instructionText.textAlignment = HA_CENTER -- Center rows in relation to each other
 
     -- Position the text relative to the screen center
     instructionText.horizontalAlignment = HA_CENTER

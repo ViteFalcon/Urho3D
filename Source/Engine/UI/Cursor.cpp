@@ -39,50 +39,61 @@ namespace Urho3D
 static const char* shapeNames[] =
 {
     "Normal",
+    "IBeam",
+    "Cross",
     "ResizeVertical",
     "ResizeDiagonalTopRight",
     "ResizeHorizontal",
     "ResizeDiagonalTopLeft",
+    "ResizeAll",
     "AcceptDrop",
     "RejectDrop",
     "Busy",
-    0
+    "BusyArrow"
 };
 
 /// OS cursor shape lookup table matching cursor shape enumeration
 static const int osCursorLookup[CS_MAX_SHAPES] =
 {
     SDL_SYSTEM_CURSOR_ARROW,    // CS_NORMAL
+    SDL_SYSTEM_CURSOR_IBEAM,     // CS_IBEAM
+    SDL_SYSTEM_CURSOR_CROSSHAIR, // CS_CROSS
     SDL_SYSTEM_CURSOR_SIZENS,   // CS_RESIZEVERTICAL
     SDL_SYSTEM_CURSOR_SIZENESW, // CS_RESIZEDIAGONAL_TOPRIGHT
     SDL_SYSTEM_CURSOR_SIZEWE,   // CS_RESIZEHORIZONTAL
     SDL_SYSTEM_CURSOR_SIZENWSE, // CS_RESIZEDIAGONAL_TOPLEFT
+    SDL_SYSTEM_CURSOR_SIZEALL,   // CS_RESIZE_ALL
     SDL_SYSTEM_CURSOR_HAND,     // CS_ACCEPTDROP
     SDL_SYSTEM_CURSOR_NO,       // CS_REJECTDROP
-    SDL_SYSTEM_CURSOR_WAIT      // CS_BUSY
+    SDL_SYSTEM_CURSOR_WAIT,   // CS_BUSY
+    SDL_SYSTEM_CURSOR_WAITARROW // CS_BUSY_ARROW
 };
 
 extern const char* UI_CATEGORY;
 
 Cursor::Cursor(Context* context) :
     BorderImage(context),
-    shape_(CS_NORMAL),
+    shape_(shapeNames[CS_NORMAL]),
     useSystemShapes_(false),
     osShapeDirty_(false)
 {
+    // Define the defaults for system cursor usage.
+    for (unsigned i = 0; i < CS_MAX_SHAPES; i++)
+        shapeInfos_[shapeNames[i]] = CursorShapeInfo(i);
+
     // Subscribe to OS mouse cursor visibility changes to be able to reapply the cursor shape
     SubscribeToEvent(E_MOUSEVISIBLECHANGED, HANDLER(Cursor, HandleMouseVisibleChanged));
 }
 
 Cursor::~Cursor()
 {
-    for (unsigned i = 0; i < CS_MAX_SHAPES; ++i)
+    HashMap<String, CursorShapeInfo>::Iterator iter = shapeInfos_.Begin();
+    for (iter; iter != shapeInfos_.End(); iter++)
     {
-        CursorShapeInfo& info = shapeInfos_[i];
-        if (info.osCursor_)
+        if (iter->second_.osCursor_)
         {
-            SDL_FreeCursor(info.osCursor_);
-            info.osCursor_ = 0;
+            SDL_FreeCursor(iter->second_.osCursor_);
+            iter->second_.osCursor_ = 0;
         }
     }
 }
@@ -91,10 +102,10 @@ void Cursor::RegisterObject(Context* context)
 {
     context->RegisterFactory<Cursor>(UI_CATEGORY);
 
-    COPY_BASE_ATTRIBUTES(Cursor, BorderImage);
-    UPDATE_ATTRIBUTE_DEFAULT_VALUE(Cursor, "Priority", M_MAX_INT);
-    ACCESSOR_ATTRIBUTE(Cursor, VAR_BOOL, "Use System Shapes", GetUseSystemShapes, SetUseSystemShapes, bool, false, AM_FILE);
-    ACCESSOR_ATTRIBUTE(Cursor, VAR_VARIANTVECTOR, "Shapes", GetShapesAttr, SetShapesAttr, VariantVector, Variant::emptyVariantVector, AM_FILE);
+    COPY_BASE_ATTRIBUTES(BorderImage);
+    UPDATE_ATTRIBUTE_DEFAULT_VALUE("Priority", M_MAX_INT);
+    ACCESSOR_ATTRIBUTE("Use System Shapes", GetUseSystemShapes, SetUseSystemShapes, bool, false, AM_FILE);
+    MIXED_ACCESSOR_ATTRIBUTE("Shapes", GetShapesAttr, SetShapesAttr, VariantVector, Variant::emptyVariantVector, AM_FILE);
 }
 
 void Cursor::GetBatches(PODVector<UIBatch>& batches, PODVector<float>& vertexData, const IntRect& currentScissor)
@@ -119,10 +130,19 @@ void Cursor::DefineShape(CursorShape shape, Image* image, const IntRect& imageRe
         return;
     }
 
+    DefineShape(shapeNames[shape], image, imageRect, hotSpot);
+}
+
+void Cursor::DefineShape(const String& shape, Image* image, const IntRect& imageRect, const IntVector2& hotSpot)
+{
     if (!image)
         return;
 
     ResourceCache* cache = GetSubsystem<ResourceCache>();
+    
+    if (!shapeInfos_.Contains(shape))
+        shapeInfos_[shape] = CursorShapeInfo();
+
     CursorShapeInfo& info = shapeInfos_[shape];
 
     // Prefer to get the texture with same name from cache to prevent creating several copies of the texture
@@ -146,30 +166,39 @@ void Cursor::DefineShape(CursorShape shape, Image* image, const IntRect& imageRe
     }
 
     // Reset current shape if it was edited
-    if (shape == shape_)
+    if (shape_ == shape)
     {
-        shape_ = CS_MAX_SHAPES;
+        shape_ = String::EMPTY;
         SetShape(shape);
     }
 }
 
-void Cursor::SetShape(CursorShape shape)
+
+void Cursor::SetShape(const String& shape)
 {
-    if (shape_ == shape || shape < CS_NORMAL || shape >= CS_MAX_SHAPES)
+    if (shape == String::EMPTY || shape.Empty() || shape_ == shape || !shapeInfos_.Contains(shape))
         return;
 
     shape_ = shape;
-    
+
     CursorShapeInfo& info = shapeInfos_[shape_];
     texture_ = info.texture_;
     imageRect_ = info.imageRect_;
     SetSize(info.imageRect_.Size());
-    
+
     // To avoid flicker, the UI subsystem will apply the OS shape once per frame. Exception: if we are using the
     // busy shape, set it immediately as we may block before that
     osShapeDirty_ = true;
-    if (shape_ == CS_BUSY)
+    if (shape_ == shapeNames[CS_BUSY])
         ApplyOSCursorShape();
+}
+
+void Cursor::SetShape(CursorShape shape)
+{
+    if (shape < CS_NORMAL || shape >= CS_MAX_SHAPES || shape_ == shapeNames[shape])
+        return;
+
+    SetShape(shapeNames[shape]);
 }
 
 void Cursor::SetUseSystemShapes(bool enable)
@@ -182,25 +211,25 @@ void Cursor::SetUseSystemShapes(bool enable)
     }
 }
 
-void Cursor::SetShapesAttr(VariantVector value)
+void Cursor::SetShapesAttr(const VariantVector& value)
 {
     unsigned index = 0;
     if (!value.Size())
         return;
 
-    unsigned numShapes = value[index++].GetUInt();
-    while (numShapes-- && (index + 4) <= value.Size())
+    VariantVector::ConstIterator iter = value.Begin();
+    for (iter; iter != value.End(); iter++)
     {
-        CursorShape shape = (CursorShape)GetStringListIndex(value[index++].GetString().CString(), shapeNames, CS_MAX_SHAPES);
-        if (shape != CS_MAX_SHAPES)
+        VariantVector shapeVector = iter->GetVariantVector();
+        if (shapeVector.Size() >= 4)
         {
-            ResourceRef ref = value[index++].GetResourceRef();
-            IntRect imageRect = value[index++].GetIntRect();
-            IntVector2 hotSpot = value[index++].GetIntVector2();
+            String shape = shapeVector[0].GetString();
+            ResourceRef ref = shapeVector[1].GetResourceRef();
+            IntRect imageRect = shapeVector[2].GetIntRect();
+            IntVector2 hotSpot = shapeVector[3].GetIntVector2();
+
             DefineShape(shape, GetSubsystem<ResourceCache>()->GetResource<Image>(ref.name_), imageRect, hotSpot);
         }
-        else
-            index += 3;
     }
 }
 
@@ -208,22 +237,18 @@ VariantVector Cursor::GetShapesAttr() const
 {
     VariantVector ret;
 
-    unsigned numShapes = 0;
-    for (unsigned i = 0; i < CS_MAX_SHAPES; ++i)
+    HashMap<String, CursorShapeInfo>::ConstIterator iter = shapeInfos_.Begin();
+    for (iter; iter != shapeInfos_.End(); iter++)
     {
-        if (shapeInfos_[i].imageRect_ != IntRect::ZERO)
-            ++numShapes;
-    }
-
-    ret.Push(numShapes);
-    for (unsigned i = 0; i < CS_MAX_SHAPES; ++i)
-    {
-        if (shapeInfos_[i].imageRect_ != IntRect::ZERO)
+        if (iter->second_.imageRect_ != IntRect::ZERO)
         {
-            ret.Push(String(shapeNames[i]));
-            ret.Push(GetResourceRef(shapeInfos_[i].texture_, Texture2D::GetTypeStatic()));
-            ret.Push(shapeInfos_[i].imageRect_);
-            ret.Push(shapeInfos_[i].hotSpot_);
+            // Could use a map but this simplifies the UI xml.
+            VariantVector shape;
+            shape.Push(iter->first_);
+            shape.Push(GetResourceRef(iter->second_.texture_, Texture2D::GetTypeStatic()));
+            shape.Push(iter->second_.imageRect_);
+            shape.Push(iter->second_.hotSpot_);
+            ret.Push(shape);
         }
     }
 
@@ -238,7 +263,7 @@ void Cursor::ApplyOSCursorShape()
         return;
 
     CursorShapeInfo& info = shapeInfos_[shape_];
-    
+
     // Remove existing SDL cursor if is not a system shape while we should be using those, or vice versa
     if (info.osCursor_ && info.systemDefined_ != useSystemShapes_)
     {
@@ -250,9 +275,9 @@ void Cursor::ApplyOSCursorShape()
     if (!info.osCursor_)
     {
         // Create a system default shape
-        if (useSystemShapes_)
+        if (useSystemShapes_ && info.systemCursor_ >= 0 && info.systemCursor_ < CS_MAX_SHAPES)
         {
-            info.osCursor_ = SDL_CreateSystemCursor((SDL_SystemCursor)osCursorLookup[shape_]);
+            info.osCursor_ = SDL_CreateSystemCursor((SDL_SystemCursor)osCursorLookup[info.systemCursor_]);
             info.systemDefined_ = true;
             if (!info.osCursor_)
                 LOGERROR("Could not create system cursor");
@@ -261,7 +286,7 @@ void Cursor::ApplyOSCursorShape()
         else if (info.image_)
         {
             SDL_Surface* surface = info.image_->GetSDLSurface(info.imageRect_);
-            
+
             if (surface)
             {
                 info.osCursor_ = SDL_CreateColorCursor(surface, info.hotSpot_.x_, info.hotSpot_.y_);
@@ -275,7 +300,7 @@ void Cursor::ApplyOSCursorShape()
 
     if (info.osCursor_)
         SDL_SetCursor(info.osCursor_);
-    
+
     osShapeDirty_ = false;
 #endif
 }

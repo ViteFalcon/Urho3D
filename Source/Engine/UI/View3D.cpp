@@ -40,6 +40,7 @@ extern const char* UI_CATEGORY;
 
 View3D::View3D(Context* context) :
     Window(context),
+    ownScene_(true),
     rttFormat_(Graphics::GetRGBFormat()),
     autoUpdate_(true)
 {
@@ -50,17 +51,18 @@ View3D::View3D(Context* context) :
 
 View3D::~View3D()
 {
+    ResetScene();
 }
 
 void View3D::RegisterObject(Context* context)
 {
     context->RegisterFactory<View3D>(UI_CATEGORY);
 
-    COPY_BASE_ATTRIBUTES(View3D, Window);
+    COPY_BASE_ATTRIBUTES(Window);
     // The texture format is API specific, so do not register it as a serializable attribute
-    ACCESSOR_ATTRIBUTE(View3D, VAR_BOOL, "Auto Update", GetAutoUpdate, SetAutoUpdate, bool, true, AM_FILE);
-    UPDATE_ATTRIBUTE_DEFAULT_VALUE(View3D, "Clip Children", true);
-    UPDATE_ATTRIBUTE_DEFAULT_VALUE(View3D, "Is Enabled", true);
+    ACCESSOR_ATTRIBUTE("Auto Update", GetAutoUpdate, SetAutoUpdate, bool, true, AM_FILE);
+    UPDATE_ATTRIBUTE_DEFAULT_VALUE("Clip Children", true);
+    UPDATE_ATTRIBUTE_DEFAULT_VALUE("Is Enabled", true);
 }
 
 void View3D::OnResize()
@@ -85,11 +87,14 @@ void View3D::OnResize()
     }
 }
 
-void View3D::SetView(Scene* scene, Camera* camera)
+void View3D::SetView(Scene* scene, Camera* camera, bool ownScene)
 {
+    ResetScene();
+    
     scene_ = scene;
     cameraNode_ = camera ? camera->GetNode() : 0;
-    
+    ownScene_ = ownScene;
+
     viewport_->SetScene(scene_);
     viewport_->SetCamera(camera);
     QueueUpdate();
@@ -148,6 +153,22 @@ Texture2D* View3D::GetDepthTexture() const
 Viewport* View3D::GetViewport() const
 {
     return viewport_;
+}
+
+void View3D::ResetScene()
+{
+    if (!scene_)
+        return;
+
+    if (!ownScene_)
+    {
+        RefCount* refCount = scene_->RefCountPtr();
+        ++refCount->refs_;
+        scene_ = 0;
+        --refCount->refs_;
+    }
+    else
+        scene_ = 0;
 }
 
 }
